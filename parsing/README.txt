@@ -1,0 +1,1 @@
+Ta file je namenjen za izgradnjo parserja regularnih stevil. 
