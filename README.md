@@ -1,5 +1,5 @@
 - [x] Naštudiraj delovanje avtomata
-- [x] Napiši komentarje
+- [x] Napiši komentarje za delovanje avtomata
 - [ ] Definiraj datatype za drevo
 		- pomagajmo si s sintakso sml
 			datatype tree = NIL | Node (int, leftTree, rightTree)

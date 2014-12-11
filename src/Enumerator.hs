@@ -21,11 +21,13 @@ data Rexp =
           | Cat Rexp Rexp     -- ^Catenation
           | Alt Rexp Rexp     -- ^Alternation
             deriving (Show,Eq,Ord)
+			
+
 
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
 
--- | State contains identificator, character and non-deterministic finite automata.
+-- | State contains identificator, character and non-deterministic finite automata (which is list of states).
 -- State derives Show class.
 data State = State Ident Char NFA deriving Show
 
@@ -110,7 +112,7 @@ getGroup ((k, v):xs) element =
 addGroup :: (Eq a) => [(a,b)] -> (a,b) ->  [(a,b)]
 addGroup memory element = element:memory 
 
--- | Function takes regular expression, identifcator and destinations states. Returns automat with meta informations (identificator, bypass value).	
+-- | Function takes regular expression, identifcator and destinations states. Returns automat (seznam stanj) with meta informations (identificator, bypass value).	
 r2n' :: Rexp -> Ident -> NFA -> (NFA,Ident,Bool)
 r2n' Nil n _ = ([], n, False)
 r2n' Eps n ds = ([], n, True)
