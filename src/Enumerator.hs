@@ -99,6 +99,16 @@ r2n r = let {
     ds = [State 0 '~' []];
     (fs, _, b) = r2n' r 1 ds
     } in fs \/ (bp b ds)
+	
+-- | Find element in memory for groups
+getGroup :: (Eq a) => [(a,b)] -> a -> Maybe b
+getGroup [] _ = Nothing
+getGroup ((k, v):xs) element = 
+	if k == element then  Just v else getGroup xs element
+	
+-- | Insert element into memory for groups
+addGroup :: (Eq a) => [(a,b)] -> (a,b) ->  [(a,b)]
+addGroup memory element = element:memory 
 
 -- | Function takes regular expression, identifcator and destinations states. Returns automat with meta informations (identificator, bypass value).	
 r2n' :: Rexp -> Ident -> NFA -> (NFA,Ident,Bool)
