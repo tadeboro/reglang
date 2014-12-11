@@ -11,8 +11,11 @@
 	- [ ] V vozlišču rekurzivno določimo število vozlišč v levem in desnem poddrevesu: ([4,0], [3,1], [2,2], [1,3], [0,4])
 
 	
-NOVA IDEJA NADALJEVANJA
-- regex z capturing groups
+Nova ideja nadaljevanja
+- regex z capturing groups  (http://www.regular-expressions.info/named.html)
 	- uporaba pomnilnika za shranjevanje vmesnih rezultatov (grup)
 
-
+- [ ] dodaj nov konstruktor za regularni izraz, ki bo definiral novo grupo
+- [ ] ustvari naš pomnilnik za grupe
+- [ ] napolni pomnilnik
+- [ ] poišči grupo v pomnilniku, ko jo zahtevamo
