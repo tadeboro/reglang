@@ -15,7 +15,8 @@ Nova ideja nadaljevanja
 - regex z capturing groups  (http://www.regular-expressions.info/named.html)
 	- uporaba pomnilnika za shranjevanje vmesnih rezultatov (grup)
 
-- [ ] dodaj nov konstruktor za regularni izraz, ki bo definiral novo grupo
+- [x] dodaj nov konstruktor za regularni izraz, ki bo definiral novo grupo
+- [x] dodaj nov ukaz, ki bo kloniral grupo s podanim imenom
 - [ ] ustvari naš pomnilnik za grupe
 - [ ] napolni pomnilnik
 - [ ] poišči grupo v pomnilniku, ko jo zahtevamo

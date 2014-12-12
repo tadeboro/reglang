@@ -20,6 +20,8 @@ data Rexp =
           | Clo Rexp          -- ^Kleene closure
           | Cat Rexp Rexp     -- ^Catenation
           | Alt Rexp Rexp     -- ^Alternation
+		  | Group [Char] Rexp -- ^Group (name the regular expression)
+		  | Paste [Char]	  -- ^Paste the group with a given name
             deriving (Show,Eq,Ord)
 			
 
@@ -127,6 +129,11 @@ r2n' (Alt x y) n ds = let {
     } in (fs\/fs', n'', b||b')
 r2n' (Clo x) n ds = let {
     (fs, n', b) = r2n' x n (fs\/ds)
+    } in (fs, n', True)
+	
+r2n' (Group name x) n ds = let {
+    (fs, n', b) = r2n' x n ds;			-- Calculate rexp as normal
+	-- add to memory
     } in (fs, n', True)
 	
 -- | It takes list of states and joins states with the same character. This removes duplicated word production. 
