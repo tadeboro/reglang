@@ -1,3 +1,16 @@
+{- |
+Module      :  $Header$
+Description :  Enumerate all words of regular language
+Copyright   :  Aleš Omerzel, Tadej Borovšak
+License     :  GPL-3
+
+Maintainer  :  omerzel.vales@gmail.com
+Stability   :  unstable
+
+Enumerate all words of regular language. This implementation lists shorter
+words before longer ones, ensuring that all words of a language are listed
+in finite amount of time.
+-}
 module Enumerator 
 (
 -- * Tip
