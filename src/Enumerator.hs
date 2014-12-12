@@ -13,7 +13,7 @@ in finite amount of time.
 -}
 module Enumerator
   ( Rexp(..)
-  , enum
+  , enumerate
   , sandwich)
   where
 
@@ -28,26 +28,23 @@ data Rexp = Nil               -- ^Empty language
           | Cat Rexp Rexp     -- ^Catenation
           | Alt Rexp Rexp     -- ^Alternation
             deriving (Show,Eq,Ord)
-			
-
 
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
 
 -- | State contains identificator, character and non-deterministic finite
 -- automata (which is list of states). State derives Show class.
-data State = State Ident Char NFA deriving Show
-
--- | States are equal if they have the same identificator. For determining
+-- States are equal if they have the same identificator. For determining
 -- ordering of states, we compare their symbols first and after that the
 -- identificators. That gives us words of equal lengths sorted in alphabetical
 -- order.
+data State = State Ident Char NFA deriving Show
 instance Eq State where
   (State i _ _) == (State i' _ _) = i == i'
 instance Ord State where
   (State i c _) <= (State i' c' _) = (c, i) <= (c', i')
 
--- | Identificator has Int type.
+-- | NFA states are labeled with integers.
 type Ident = Int
 
 -- | Length-ordered list. Shorter lists come before longer lists when sorting.
@@ -56,7 +53,7 @@ instance Ord a => Ord (LOL a) where
   LOL x <= LOL y = (length x, x) <= (length y, y)
 
 -- | Concatenation of length ordered lists.
-(+++) :: LOL a -> LOL a -> LOL a       
+(+++) :: LOL a -> LOL a -> LOL a
 LOL x +++ LOL y = LOL (x++y)			
 			
 -- | Length-ordered string. Specialization of LOL. 		
@@ -73,16 +70,16 @@ xs@(x:xt) \/ ys@(y:yt) =
     GT -> y : xs \/ yt
 
 -- | General crossproduct of two list with a given function.
-xprod :: (Ord a, Ord b, Ord c) => (a->b->c) -> [a] -> [b] -> [c]
+xprod :: (Ord a, Ord b, Ord c) => (a -> b -> c) -> [a] -> [b] -> [c]
 xprod _ [] _ = []
 xprod _ _ [] = []
-xprod f (x:xt) ys@(y:yt) =
-  (f x y) : (xprod f [x] yt) \/ (xprod f xt ys)
+xprod f (x : xt) ys@(y : yt) =
+  f x y : xprod f [x] yt \/ xprod f xt ys
 
 -- | Closure.	
-closure :: Ord a => (a->a->a) -> a -> [a] -> [a]
+closure :: Ord a => (a -> a -> a) -> a -> [a] -> [a]
 closure f z [] = [z]
-closure f z xs@(x:xt) =
+closure f z xs@(x : xt) =
   if x == z
      then closure f z xt
      else z : xprod f xs (closure f z xs)
@@ -95,7 +92,7 @@ alt = (\/)
 cat :: [LOS] -> [LOS] -> [LOS]
 cat = xprod (+++)
 
--- | Closure operator.              
+-- | Closure operator.
 clo :: [LOS] -> [LOS]
 clo = closure (+++) (LOL "")	
 	
@@ -106,54 +103,50 @@ bp False _ = []
 
 -- | Function which determines starting state which is actually set as
 -- destination state.
-r2n :: Rexp -> NFA        
-r2n r = let {
-    ds = [State 0 '~' []];
-    (fs, _, b) = r2n' r 1 ds
-    } in fs \/ (bp b ds)
+rexp2nfa :: Rexp -> NFA
+rexp2nfa r = fs \/ bp b ds
+  where ds = [State 0 '~' []];
+        (fs, _, b) = rexp2nfa' r 1 ds
 
 -- | Function takes regular expression, identifcator and destinations states.
 -- Returns automat (seznam stanj) with meta informations (identificator,
 -- bypass value).	
-r2n' :: Rexp -> Ident -> NFA -> (NFA,Ident,Bool)
-r2n' Nil n _ = ([], n, False)
-r2n' Eps n ds = ([], n, True)
-r2n' (Sym c) n ds = ([State n c ds], succ n, False)
-r2n' (Cat x y) n ds = let {
-    (fs, n', b) = r2n' y n ds;
-    (fs', n'', b') = r2n' x n' (fs\/(bp b ds));
-    } in (fs'\/(bp b' fs), n'', b&&b')
-r2n' (Alt x y) n ds = let {
-    (fs, n', b) = r2n' y n ds;
-    (fs', n'', b') = r2n' x n' ds;
-    } in (fs\/fs', n'', b||b')
-r2n' (Clo x) n ds = let {
-    (fs, n', b) = r2n' x n (fs\/ds)
-    } in (fs, n', True)
+rexp2nfa' :: Rexp -> Ident -> NFA -> (NFA, Ident, Bool)
+rexp2nfa' Nil       n _  = ([], n, False)
+rexp2nfa' Eps       n _  = ([], n, True)
+rexp2nfa' (Sym c)   n ds = ([State n c ds], succ n, False)
+rexp2nfa' (Cat x y) n ds = (fs' \/ bp b' fs, n'', b && b')
+  where (fs , n' , b ) = rexp2nfa' y n ds;
+        (fs', n'', b') = rexp2nfa' x n' (fs \/ bp b ds);
+rexp2nfa' (Alt x y) n ds = (fs \/ fs', n'', b || b')
+  where (fs , n' , b ) = rexp2nfa' y n ds;
+        (fs', n'', b') = rexp2nfa' x n' ds;
+rexp2nfa' (Clo x)   n ds = (fs, n', True)
+  where (fs, n', b) = rexp2nfa' x n (fs \/ ds)
 	
 -- | It takes list of states and joins states with the same character. This
--- removes duplicated word production. That accelerates speed of algorithm. 
+-- removes duplicated word production and accelerates speed of algorithm.
 grp :: NFA -> NFA
-grp (m@(State _ c ds) : ms@((State _ c' ds') : mt)) =
+grp (m@(State _ c ds) : ms@(State _ c' ds' : mt)) =
   if c == c'
-     then grp ((State (-1) c (ds \/ ds')) : mt)
+     then grp (State (-1) c (ds \/ ds') : mt)
      else m : grp ms
 grp ms = ms
 
 -- | Tells us if the word is part of automata language. State 0 is set as
--- the only final state. 
+-- the only final state.
 accept :: NFA -> Bool
 accept ds = 0 `elem` [i | (State i _ _) <- ds]
 
--- | Generates length ordered list of strings from automata. 
-visit :: [(String,NFA)] -> [String]  
+-- | Generates length ordered list of strings from automata.
+visit :: [(String,NFA)] -> [String]
 visit [] = []
 visit ((x,ds):ws) =
   let xs = visit (ws ++ [(x++[c],ds') | (State _ c ds') <- grp ds])
   in if accept ds then x:xs else xs
 
 -- | Removes different production of the same length words. Makes parsing more
--- efficient. 
+-- efficient.
 deNil :: Rexp -> Rexp
 deNil (Cat x y) =
   case (deNil x, deNil y) of
@@ -172,12 +165,12 @@ deNil (Clo x) =
 deNil x = x	
 	
 -- | Properly initialise visit call. It starts with empty word.
-enumA :: NFA -> [String]
-enumA starts = visit [("",starts)]
+enumNFA :: NFA -> [String]
+enumNFA starts = visit [("", starts)]
 	
--- | Exposes implemented functionality. It is user friendly function. 
-enum :: Rexp -> [String]
-enum = enumA . r2n . deNil
+-- | Exposes implemented functionality. It is user friendly function.
+enumerate :: Rexp -> [String]
+enumerate = enumNFA . rexp2nfa . deNil
 
 a = Sym 'a'
 b = Sym 'b'
@@ -191,5 +184,3 @@ b_b = Alt b b
 a_b = Alt a b	
 	
 sandwich = Cat a (Cat (Clo b) a)
---enumR :: Rexp -> [String]
---enumR r = undefined
