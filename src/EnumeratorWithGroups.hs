@@ -29,6 +29,9 @@ data Rexp =
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
 
+-- | Type for collection of groups
+type Memory = [([Char], Rexp)]
+
 -- | State contains identificator, character and non-deterministic finite automata (which is list of states).
 -- State derives Show class.
 data State = State Ident Char NFA deriving Show
@@ -101,7 +104,8 @@ bp False _ = []
 r2n :: Rexp -> NFA        
 r2n r = let {
     ds = [State 0 '~' []];
-    (fs, _, b) = r2n' r 1 ds
+	memory = [];
+    (fs, _, b, memory') = r2n' r 1 ds memory
     } in fs \/ (bp b ds)
 	
 -- | Find element in memory for groups
@@ -115,26 +119,26 @@ addGroup :: (Eq a) => [(a,b)] -> (a,b) ->  [(a,b)]
 addGroup memory element = element:memory 
 
 -- | Function takes regular expression, identifcator and destinations states. Returns automat (seznam stanj) with meta informations (identificator, bypass value).	
-r2n' :: Rexp -> Ident -> NFA -> (NFA,Ident,Bool)
-r2n' Nil n _ = ([], n, False)
-r2n' Eps n ds = ([], n, True)
-r2n' (Sym c) n ds = ([State n c ds], succ n, False)
-r2n' (Cat x y) n ds = let {
-    (fs, n', b) = r2n' y n ds;
-    (fs', n'', b') = r2n' x n' (fs\/(bp b ds));
-    } in (fs'\/(bp b' fs), n'', b&&b')
-r2n' (Alt x y) n ds = let {
-    (fs, n', b) = r2n' y n ds;
-    (fs', n'', b') = r2n' x n' ds;
-    } in (fs\/fs', n'', b||b')
-r2n' (Clo x) n ds = let {
-    (fs, n', b) = r2n' x n (fs\/ds)
-    } in (fs, n', True)
+r2n' :: Rexp -> Ident -> NFA -> Memory -> (NFA,Ident,Bool, Memory)
+r2n' Nil n _ memory = ([], n, False, memory)
+r2n' Eps n ds memory = ([], n, True, memory)
+r2n' (Sym c) n ds memory = ([State n c ds], succ n, False, memory)
+r2n' (Cat x y) n ds memory = let {
+    (fs, n', b, memory') = r2n' y n ds memory;
+    (fs', n'', b', memory'') = r2n' x n' (fs\/(bp b ds)) memory';
+    } in (fs'\/(bp b' fs), n'', b&&b', memory'')
+r2n' (Alt x y) n ds memory = let {
+    (fs, n', b, memory') = r2n' y n ds memory;
+    (fs', n'', b', memory'') = r2n' x n' ds memory';
+    } in (fs\/fs', n'', b||b', memory'')
+r2n' (Clo x) n ds memory = let {
+    (fs, n', b, memory') = r2n' x n (fs\/ds) memory
+    } in (fs, n', True, memory')
 	
-r2n' (Group name x) n ds = let {
-    (fs, n', b) = r2n' x n ds;			-- Calculate rexp as normal
-	-- add to memory
-    } in (fs, n', True)
+r2n' (Group name x) n ds memory = let {
+    (fs, n', b, memory') = r2n' x n ds memory;			-- Calculate rexp as normal
+	memory'' = (name, x):memory'
+    } in (fs, n', True, memory'')
 	
 -- | It takes list of states and joins states with the same character. This removes duplicated word production. 
 -- That accelerates speed of algorithm. 
