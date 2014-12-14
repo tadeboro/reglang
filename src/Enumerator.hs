@@ -142,7 +142,15 @@ accept ds = 0 `elem` [i | (State i _ _) <- ds]
 visit :: [(String,NFA)] -> [String]
 visit [] = []
 visit ((x,ds):ws) =
+  -- x = a word, 
+  -- ds = destination states, where we can go at this point, 
+  -- grp helps us to extract those dest. states
+  -- [ ] = list of (word+c, ds'), where c is character
+  -- visit -> ws+[ ]
+  -- xs = list of valid words
   let xs = visit (ws ++ [(x++[c],ds') | (State _ c ds') <- grp ds])
+  -- returns list of x
+  -- returns list of words (because x = word)
   in if accept ds then x:xs else xs
 
 -- | Removes different production of the same length words. Makes parsing more
