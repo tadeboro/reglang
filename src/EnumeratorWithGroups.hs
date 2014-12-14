@@ -13,10 +13,11 @@ in finite amount of time.
 -}
 module Enumerator
   ( Rexp(..)
-  , enumerate
+  , e
   , sandwich
-  , group)
+  , g)
   where
+import Data.Char
 
 infixr 5 +++   -- catenate LOL data
 infixl 6 \/    -- set union
@@ -140,9 +141,13 @@ grp ms = ms
 accept :: NFA -> Bool
 accept ds = 0 `elem` [i | (State i _ _) <- ds]
 
+readMem :: [String] -> Int -> String
+readMem [] _ = []
+readMem (x:xs) 1 = x
+readMem (x:xs) num = readMem xs (num-1)
 
-
-
+	
+checkGrp mem c = if c == '1' then readMem mem (digitToInt c) else  [c]
 
 groupManager isGrp g mem c =
 	let 
@@ -156,7 +161,7 @@ groupManager isGrp g mem c =
 visit :: [(String,NFA,Bool, String, [String])] -> [String]
 visit [] = []
 visit ((x,ds,isGrp, g, mem):ws) =
-  let xs = visit (ws ++ [(x++[c],ds', isGrp', g++e, mem') | (State _ c ds') <- grp ds, 	(isGrp', e, mem') <- groupManager isGrp g mem c])
+  let xs = visit (ws ++ [(x++(checkGrp mem c),ds', isGrp', g++e, mem') | (State _ c ds') <- grp ds, (isGrp', e, mem') <- groupManager isGrp g mem c])
   in if accept ds then x:xs else xs
 
 -- | Removes different production of the same length words. Makes parsing more
@@ -183,14 +188,15 @@ enumNFA :: NFA -> [String]
 enumNFA starts = visit [("", starts, False, "", [])]
 	
 -- | Exposes implemented functionality. It is user friendly function.
-enumerate :: Rexp -> [String]
-enumerate = enumNFA . rexp2nfa . deNil
+e :: Rexp -> [String]
+e = enumNFA . rexp2nfa . deNil
 
 a = Sym 'a'
 b = Sym 'b'
 c = Sym 'c'
 p1 = Sym '('
 p2 = Sym ')'
+n1 = Sym '1'
 aa = Cat a a
 bb = Cat b b
 ab = Cat a b
@@ -200,4 +206,4 @@ b_b = Alt b b
 a_b = Alt a b	
 	
 sandwich = Cat a (Cat (Clo b) a)
-group = Cat p1 (Cat a p2)
+g = Cat (Cat p1 (Cat a (Cat b (Cat b p2)))) n1
