@@ -9,6 +9,9 @@ Stability   :  unstable
 
 Parse string representation of regular expresion into representation, used
 by enumerator.
+
+Parser currently operates on ASCII strings and supports operators ".", "?",
+"*", "+", "()" and "|".
 -}
 module Parser
   ( Rexp(..)
@@ -82,13 +85,20 @@ errMsg e = "Error at line " ++ line ++ ", column " ++ col ++ "."
         col = show . sourceColumn . errorPos $ e
 
 -- | Parse string representation of regular expression into tree form.
+-- If an error occurs during parsing, location of error is returned as
+-- string.
 --
--- >>> parseExpr "Abcd"
+-- >>> parseRexp "Abcd"
 -- Right (Cat (Cat (Cat (Sym 'A') (Sym 'b')) (Sym 'c')) (Sym 'd'))
--- >>> parseExpr "a(bc)?d"
+--
+-- >>> parseRexp "a(bc)?d"
 -- Right (Cat (Cat (Sym 'a') (Alt Eps (Cat (Sym 'b') (Sym 'c')))) (Sym 'd'))
--- >>> parseExpr "ab+c"
+--
+-- >>> parseRexp "ab+c"
 -- Right (Cat (Cat (Sym 'a') (Cat (Sym 'b') (Clo (Sym 'b')))) (Sym 'c'))
+--
+-- >>> parseRexp "a|"
+-- Left "Error at line 1, column 3."
 parseRexp :: String -> Either String Rexp
 parseRexp input =
   case parse (exprP <* eof) "(Test)" input of

@@ -9,7 +9,7 @@ Stability   :  unstable
 
 Enumerate all words of regular language. This implementation lists shorter
 words before longer ones, ensuring that all words of a language are listed
-in finite amount of time.
+in finite amount of time. Words of the same length are sorted alphabetically.
 -}
 module Enumerator
   ( enumerate
@@ -168,16 +168,20 @@ deNil x = x
 enumNFA :: NFA -> [String]
 enumNFA starts = visit [("", starts)]
 
--- | Enumerate regular expression. Regular expression should be in
--- string format.
+-- | Enumerate regular expression, passed in as a 'String'.
 --
 -- >>> enumerate "a|t"
--- Right ["a", "t"]
+-- Right ["a","t"]
+--
 -- >>> enumerate "T(es)?t"
--- Right ["Tt", "Test"]
+-- Right ["Tt","Test"]
+--
 -- >>> let Right tmp = enumerate "a(bc)+a"
 -- >>> take 5 tmp
 -- ["abca","abcbca","abcbcbca","abcbcbcbca","abcbcbcbcbca"]
+--
+-- >>> enumerate "?"
+-- Left "Error at line 1, column 1."
 enumerate :: String -> Either String [String]
 enumerate regex = case parseRexp regex of
                   Left err -> Left err
