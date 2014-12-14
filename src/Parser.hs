@@ -10,14 +10,23 @@ Stability   :  unstable
 Parse string representation of regular expresion into representation, used
 by enumerator.
 -}
-module Parser (parseRexp) where
+module Parser
+  ( Rexp(..)
+  , parseRexp)
+  where
 
 import Text.ParserCombinators.Parsec
 import Control.Monad
 import Control.Applicative ((<*))
 
-import Enumerator (Rexp(..))
-
+-- | Constructors for regular expressions.
+data Rexp = Nil               -- ^Empty language
+          | Eps               -- ^Empty string
+          | Sym Char          -- ^Symbol of the alphabet
+          | Clo Rexp          -- ^Kleene closure
+          | Cat Rexp Rexp     -- ^Catenation
+          | Alt Rexp Rexp     -- ^Alternation
+            deriving (Show,Eq,Ord)
 
 -- Characters that can be used in regular expressions
 charClass = " !\"#$%&'()*+,-./0123456789:;<=>?" ++
@@ -66,9 +75,22 @@ anyP = char '.' >> return anyExpr
 escP :: GenParser Char st Rexp
 escP = char '\\' >> liftM Sym anyChar
 
--- | Function that 
+-- Helper to display error position
+errMsg :: ParseError -> String
+errMsg e = "Error at line " ++ line ++ ", column " ++ col ++ "."
+  where line = show . sourceLine . errorPos $ e
+        col = show . sourceColumn . errorPos $ e
+
+-- | Parse string representation of regular expression into tree form.
+--
+-- >>> parseExpr "Abcd"
+-- Right (Cat (Cat (Cat (Sym 'A') (Sym 'b')) (Sym 'c')) (Sym 'd'))
+-- >>> parseExpr "a(bc)?d"
+-- Right (Cat (Cat (Sym 'a') (Alt Eps (Cat (Sym 'b') (Sym 'c')))) (Sym 'd'))
+-- >>> parseExpr "ab+c"
+-- Right (Cat (Cat (Sym 'a') (Cat (Sym 'b') (Clo (Sym 'b')))) (Sym 'c'))
 parseRexp :: String -> Either String Rexp
 parseRexp input =
   case parse (exprP <* eof) "(Test)" input of
-       Left e -> Left $ "Error parsing regex: " ++ (show e)
+       Left e -> Left $ errMsg e
        Right r -> Right r

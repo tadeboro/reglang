@@ -11,23 +11,12 @@ Enumerate all words of regular language. This implementation lists shorter
 words before longer ones, ensuring that all words of a language are listed
 in finite amount of time.
 -}
-module Enumerator
-  ( Rexp(..)
-  , enumerate
-  , sandwich)
-  where
+module Enumerator (enumerate) where
+
+import Parser
 
 infixr 5 +++   -- catenate LOL data
 infixl 6 \/    -- set union
-
--- | Constructors for regular expressions.
-data Rexp = Nil               -- ^Empty language
-          | Eps               -- ^Empty string
-          | Sym Char          -- ^Symbol of the alphabet
-          | Clo Rexp          -- ^Kleene closure
-          | Cat Rexp Rexp     -- ^Catenation
-          | Alt Rexp Rexp     -- ^Alternation
-            deriving (Show,Eq,Ord)
 
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
@@ -175,20 +164,18 @@ deNil x = x
 -- | Properly initialise visit call. It starts with empty word.
 enumNFA :: NFA -> [String]
 enumNFA starts = visit [("", starts)]
-	
--- | Exposes implemented functionality. It is user friendly function.
-enumerate :: Rexp -> [String]
-enumerate = enumNFA . rexp2nfa . deNil
 
-a = Sym 'a'
-b = Sym 'b'
-c = Sym 'c'
-aa = Cat a a
-bb = Cat b b
-ab = Cat a b
-ba = Cat b a
-a_a = Alt a a
-b_b = Alt b b
-a_b = Alt a b	
-	
-sandwich = Cat a (Cat (Clo b) a)
+-- | Enumerate regular expression. Regular expression should be in
+-- string format.
+--
+-- >>> enumerate "a|t"
+-- Right ["a", "t"]
+-- >>> enumerate "T(es)?t"
+-- Right ["Tt", "Test"]
+-- >>> let Right tmp = enumerate "a(bc)+a"
+-- >>> take 5 tmp
+-- ["abca","abcbca","abcbcbca","abcbcbcbca","abcbcbcbcbca"]
+enumerate :: String -> Either String [String]
+enumerate regex = case parseRexp regex of
+                  Left err -> Left err
+                  Right expr -> Right $ enumNFA . rexp2nfa . deNil $ expr
