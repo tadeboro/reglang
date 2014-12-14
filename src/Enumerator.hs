@@ -11,7 +11,10 @@ Enumerate all words of regular language. This implementation lists shorter
 words before longer ones, ensuring that all words of a language are listed
 in finite amount of time.
 -}
-module Enumerator (enumerate) where
+module Enumerator
+  ( enumerate
+  , enumerate1
+  ) where
 
 import Parser
 
@@ -178,4 +181,13 @@ enumNFA starts = visit [("", starts)]
 enumerate :: String -> Either String [String]
 enumerate regex = case parseRexp regex of
                   Left err -> Left err
-                  Right expr -> Right $ enumNFA . rexp2nfa . deNil $ expr
+                  Right expr -> Right $ enumerate1 expr
+
+-- | Enumerate regular expression, passed in as a 'Rexp'. Proper
+-- representation can be obtained from string using 'parseRexp'
+-- function.
+--
+-- >>> take 5 $ enumerate1 $ Clo (Sym 'b')
+-- ["","b","bb","bbb","bbbb"]
+enumerate1 :: Rexp -> [String]
+enumerate1 = enumNFA . rexp2nfa . deNil
