@@ -1,3 +1,8 @@
+Current project status:
+[![Build Status](https://travis-ci.org/tadeboro/reglang.svg?branch=master)]
+(https://travis-ci.org/tadeboro/reglang)
+
+
 - [x] Naštudiraj delovanje avtomata
 - [x] Napiši komentarje za delovanje avtomata
 - [ ] Definiraj datatype za drevo
