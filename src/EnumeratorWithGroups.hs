@@ -206,4 +206,4 @@ b_b = Alt b b
 a_b = Alt a b	
 	
 sandwich = Cat a (Cat (Clo b) a)
-g = Cat (Cat p1 (Cat a (Cat b (Cat b p2)))) n1
+g = Cat (Cat p1 (Cat (Clo a) p2)) n1
