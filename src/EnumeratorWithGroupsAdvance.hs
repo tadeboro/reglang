@@ -154,46 +154,63 @@ newGroup (x:xs) curGroup c =
 -- | Close group
 closeGroup :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
 closeGroup group (x:xs) c = (group, xs, [c]) 
+
+-- | Add into group
+addToGroup :: GROUPS -> Int -> Char -> GROUPS
+addToGroup [] _ _= [] 
+-- We have to go to the 0 because the first element of the groups is 'number of all groups'
+-- so we need to skip it 
+addToGroup (x:xs) 0 c = (x ++ [c]):xs
+addToGroup (x:xs) n c = x:(addToGroup xs (n - 1) c)
+
 -- | Add into groups
---addToGroups :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
---addToGroups groups curgroups c = 
---addToGroups groups curgroups c =
+addToGroups :: GROUPS -> CURGROUPS -> Char -> GROUPS
+addToGroups groups [] c = groups
+addToGroups groups (x:xs) c =
+	let
+		groups1 = addToGroup groups x c
+		groups2 = addToGroups groups1 xs c
+	in
+		groups2
 
-
+-- test addToGroups		
+atg = addToGroups ["2", "a", "b"] [1,2] 'c'
 
 -- | Get group 
-getGroup :: [String] -> Int -> String
-getGroup [] 0 = ""
+getGroup :: GROUPS -> Int -> String
+getGroup [] _ = "Error"
 getGroup (x:xs) 0 = x
 getGroup (x:xs) n = getGroup xs (n - 1)
 	
 
 -- | If character is digit it returns group with id of the digit otherwise it returns input character.
+-- If character is not a special character then it's added to all grouops it's located.
 checkChar :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
 checkChar groups curgroups c =
 	if isDigit c
 	-- if digit then return group
-	then (groups, curgroups, getGroup groups $ digitToInt c)
+	then (groups, curgroups, getGroup groups (digitToInt c))
 	-- if '(' then start new group
 	else if c == '(' then newGroup groups curgroups c
 	-- if ')' then close last group
 	else if c == ')' then closeGroup groups curgroups c
-	else addToGroups groups curgroups c
+	else 
+		let groups' = addToGroups groups curgroups c in (groups', curgroups, [c])
 
--- Put character beside, '1' to get a group or 'c' to get this character as string ...	
-cc = checkChar [] [] '('
+-- test checkChar	
+cc = checkChar ["2", "ac", "bc"] [1] '2'
 
 -- | Generates length ordered list of strings from automata.
-visit :: [(String,NFA)] -> [String]
+visit :: [(String,NFA,GROUPS,CURGROUPS)] -> [String]
 visit [] = []
-visit ((x,ds):ws) =
+visit ((x,ds,groups, curgroups):ws) =
   -- x = a word, 
   -- ds = destination states, where we can go at this point, 
   -- grp helps us to extract those dest. states
   -- [ ] = list of (word+c, ds'), where c is character
   -- visit -> ws+[ ]
   -- xs = list of valid words
-  let xs = visit (ws ++ [(x++[c],ds') | (State _ c ds') <- grp ds])
+  let xs = visit (ws ++ [(x++s',ds',groups', curgroups') | (State _ c ds') <- grp ds, (groups', curgroups', s') <- [checkChar groups curgroups c] ])
   -- returns list of x
   -- returns list of words (because x = word)
   in if accept ds then x:xs else xs
@@ -219,7 +236,7 @@ deNil x = x
 	
 -- | Properly initialise visit call. It starts with empty word.
 enumNFA :: NFA -> [String]
-enumNFA starts = visit [("", starts)]
+enumNFA starts = visit [("", starts, [], [])]
 
 -- | Enumerate regular expression, passed in as a 'String'.
 --
@@ -248,3 +265,15 @@ enumerate regex = case parseRexp regex of
 -- ["","b","bb","bbb","bbbb"]
 enumerate1 :: Rexp -> [String]
 enumerate1 = enumNFA . rexp2nfa . deNil
+
+a = Sym 'a'
+b = Sym 'b'
+c = Sym 'c'
+p1 = Sym '('
+p2 = Sym ')'
+n1 = Sym '1'
+n2 = Sym '2'
+
+e = enumerate1
+g = Cat (Cat p1 (Cat (Clo a) p2)) n1
+g2 = Cat (Cat p1 (Cat ( Cat (Cat p1 (Cat (Clo a) p2)) b) p2)) n2
