@@ -40,7 +40,7 @@ Osnovna verzija
 	- [x] \(a*\)1 = (), (a)a, (aa)aa, (aaa)aaa
 
 Napredna verzija
-	Radi bi dodali še:
+	Radi bi dodali še
 	- [x] gnezdenje grup: (a(b))2 = (a(b))b
 	- [ ] poseben znak za 'pastanje' grupe in ne Int številke (opcijsko)
 Gnezdene grupe (oz. pri nas oklepaji)
@@ -53,11 +53,13 @@ Gnezdene grupe (oz. pri nas oklepaji)
 			- ko pridemo do zaklepaja
 		- [x] Funkcija, ki zbriše številko grupe, ki se je končala, iz pomožnega pomnilnika
 		- [ ] Funkcija za dodajanje elementov v vse trenutne grupe
-				- [x] NI OPTIMALNO 	- pomozni pomnilnik je oblike [5,2,1] in za enkrat bomo vzeli grupo in vanjo zapisali znak
-								- O(n^2)
-				- [ ] OPTIMALNO 	- da bi pomnozni pomnilnik obrnili [1,2,5] - podaljsa cas kreiranja in 
-									zapiranja grupe, ker dodajamo nove grupe na konec, a je to precej redkeje, kot dodajanje 
-									elementov v grupe, kjer pa se lahko na podlagi stevilk v pomoznem pomnilniku v O(n) 
-									sprehodimo po glavnem pomnilniku
-								- O(n)
+				- [x] NI OPTIMALNO 	
+					- pomozni pomnilnik je oblike [5,2,1] in za enkrat bomo vzeli grupo in vanjo zapisali znak
+					- O(n^2)
+				- [ ] OPTIMALNO 	
+					- da bi pomnozni pomnilnik obrnili [1,2,5] - podaljsa cas kreiranja in 
+					zapiranja grupe, ker dodajamo nove grupe na konec, a je to precej redkeje, kot dodajanje 
+					elementov v grupe, kjer pa se lahko na podlagi stevilk v pomoznem pomnilniku v O(n) 
+					sprehodimo po glavnem pomnilniku
+					- O(n)
 	- [x] Funkcija, ki doda element vsem grupam v gl. pomnilniku, ki so zastopane v pomožnem pomnilniku 	
