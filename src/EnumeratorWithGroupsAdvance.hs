@@ -178,7 +178,7 @@ atg = addToGroups ["2", "a", "b"] [1,2] 'c'
 
 -- | Get group 
 getGroup :: GROUPS -> Int -> String
-getGroup [] _ = "Error"
+getGroup [] _ = "Parenthesis probably not ok"
 getGroup (x:xs) 0 = x
 getGroup (x:xs) n = getGroup xs (n - 1)
 	
@@ -274,6 +274,8 @@ p2 = Sym ')'
 n1 = Sym '1'
 n2 = Sym '2'
 
-e = enumerate1
+ee = enumerate1
 g = Cat (Cat p1 (Cat (Clo a) p2)) n1
 g2 = Cat (Cat p1 (Cat ( Cat (Cat p1 (Cat (Clo a) p2)) b) p2)) n2
+
+e = enumerate "(a*)1"
