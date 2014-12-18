@@ -27,7 +27,7 @@ type NFA = [State]
 
 -- | Defines type of all groups. Its behaviour is just like stack.
 -- The first (the top) field is RESERVED for number of groups. The number is stored as string.
-type GROUPS = [String]
+type GROUPS = (Int, [String])
 
 -- | Defines type of memory which contains indexes of activated groups at certain state.
 type CURGROUPS = [Int]
@@ -140,48 +140,35 @@ accept ds = 0 `elem` [i | (State i _ _) <- ds]
 
 
 -- | Define new group. Character is here just to simplify checkChar funciton. 
-newGroup :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String) 
+newGroup :: GROUPS -> CURGROUPS -> (GROUPS, CURGROUPS, String) 
 -- First inserted group
-newGroup [] _ c = (["1", ""], [1], [c])
+newGroup (_,[]) _ = ((1, [""]), [0], "")
 -- Later added groups
-newGroup (x:xs) curGroup c = 
-	let
-		x' = (read x :: Int) + 1
-		x = show 1
-	in
-		(x:"":xs, x':curGroup, [c])
+newGroup (n, xs) curGroup = 
+	(((n+1), "":xs), n:curGroup, "")
 	
+ng = newGroup (3,["a", "b", "c"]) [2,0] 	
 -- | Close group
-closeGroup :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
-closeGroup group (x:xs) c = (group, xs, [c]) 
-
--- | Add into group
-addToGroup :: GROUPS -> Int -> Char -> GROUPS
-addToGroup [] _ _= [] 
--- We have to go to the 0 because the first element of the groups is 'number of all groups'
--- so we need to skip it 
-addToGroup (x:xs) 0 c = (x ++ [c]):xs
-addToGroup (x:xs) n c = x:(addToGroup xs (n - 1) c)
+closeGroup :: GROUPS -> CURGROUPS -> (GROUPS, CURGROUPS, String)
+closeGroup group (x:xs) = (group, xs, "") 
 
 -- | Add into groups
 addToGroups :: GROUPS -> CURGROUPS -> Char -> GROUPS
-addToGroups groups [] c = groups
-addToGroups groups (x:xs) c =
+addToGroups groups [] _ = groups
+addToGroups (n, y:ys) (x:xs) c =
 	let
-		groups1 = addToGroup groups x c
-		groups2 = addToGroups groups1 xs c
+		i = n - x - 1
+		(_, zs) = addToGroups (n-1, ys) (if i == 0 then xs else x:xs) c
 	in
-		groups2
+		if i == 0 then (n, (y++[c]):zs)	else (n, y:zs)
 
 -- test addToGroups		
-atg = addToGroups ["2", "a", "b"] [1,2] 'c'
+atg = addToGroups (3,["a", "b", "c"]) [2,0] 'c'
 
 -- | Get group 
 getGroup :: GROUPS -> Int -> String
-getGroup [] _ = "Error: probably with parenthesis"
-getGroup (x:xs) 0 = x
-getGroup (x:xs) n = getGroup xs (n - 1)
-	
+getGroup (len,x:xs) n =
+	if len - n - 1 == 0 then x else getGroup (len-1, xs) n  
 
 -- | If character is digit it returns group with id of the digit otherwise it returns input character.
 -- If character is not a special character then it's added to all grouops it's located.
@@ -189,16 +176,16 @@ checkChar :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
 checkChar groups curgroups c =
 	if isDigit c
 	-- if digit then return group
-	then (groups, curgroups, getGroup groups (digitToInt c))
+	then (groups, curgroups, getGroup groups ((digitToInt c) - 1))
 	-- if '(' then start new group
-	else if c == '(' then newGroup groups curgroups c
+	else if c == '<' then newGroup groups curgroups
 	-- if ')' then close last group
-	else if c == ')' then closeGroup groups curgroups c
+	else if c == '>' then closeGroup groups curgroups
 	else 
 		let groups' = addToGroups groups curgroups c in (groups', curgroups, [c])
 
 -- test checkChar	
-cc = checkChar ["2", "ac", "bc"] [1] '2'
+cc = checkChar (2, ["ac", "bc"]) [1] '1'
 
 -- | Generates length ordered list of strings from automata.
 visit :: [(String,NFA,GROUPS,CURGROUPS)] -> [String]
@@ -236,7 +223,7 @@ deNil x = x
 	
 -- | Properly initialise visit call. It starts with empty word.
 enumNFA :: NFA -> [String]
-enumNFA starts = visit [("", starts, [], [])]
+enumNFA starts = visit [("", starts, (0,[]), [])]
 
 -- | Enumerate regular expression, passed in as a 'String'.
 --

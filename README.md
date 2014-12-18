@@ -57,10 +57,29 @@ NAPREDNA VERZIJA
 			- [x] NI OPTIMALNO 	
 				- pomozni pomnilnik je oblike [5,2,1] in za enkrat bomo vzeli grupo in vanjo zapisali znak
 				- O(n^2)
-			- [ ] OPTIMALNO 	
-				- da bi pomnozni pomnilnik obrnili [1,2,5] - podaljsa cas kreiranja in 
-				zapiranja grupe, ker dodajamo nove grupe na konec, a je to precej redkeje, kot dodajanje 
-				elementov v grupe, kjer pa se lahko na podlagi stevilk v pomoznem pomnilniku v O(n) 
-				sprehodimo po glavnem pomnilniku
+			- [x] OPTIMALNO 	
+				- v enem prehodu dodamo v vse grupe določen znak
 				- O(n)
 	- [x] Funkcija, ki doda element vsem grupam v gl. pomnilniku, ki so zastopane v pomožnem pomnilniku 	
+	
+POPRAVKI
+- GROUPS -> (Int, [String])
+- vsi-cur
+
+OPAZKE
+- grupe ne pokvarijo urejenosti nizov po dolžini -vse nize z grupami lahko enolično preslikamo v nize brez grup
+
+- a(b)1* -> KUL, ker '1' obravnava kot navaden znak, npr 'a'
+- a(a(b)+)%2 -> 
+	a(a(b)+)     |   a(a(b)+)%2
+	aab				aab%b
+	aabb			aabb%bb
+	
+- a(bb)(a|1) -> PADE, ker bi morali hkrati preverjat še dolžino nizov na obeh straneh alternacije
+
+- (a | (b)) (c | \2) -> 2. ni nujno da se sklicuje na b v drugi grupi, ker možno, da ne obstaja, ampak
+je naslednji oklep0aj
+- back ref, če ga ni -> error
+
+TABLA
+- 

@@ -65,7 +65,10 @@ repP = try zeromoreP <|> try zerooneP <|> try onemoreP <|> baseP
 baseP = choice [groupP, symP, anyP, escP]
 
 -- Captured group: group -> '(' expr ')'
-groupP = between (char '(') (char ')') exprP
+groupP = do char '('
+            e <- exprP
+            char ')'
+            return $ Cat (Sym '<') (Cat e (Sym '>'))
 
 -- Symbols in regex
 symP = liftM Sym $ noneOf "().|\\?*+"
