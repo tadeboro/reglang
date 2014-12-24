@@ -25,13 +25,6 @@ infixl 6 \/    -- set union
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
 
--- | Defines type of all groups. Its behaviour is just like stack.
--- The first (the top) field is RESERVED for number of groups. The number is stored as string.
-type GROUPS = (Int, [String])
-
--- | Defines type of memory which contains indexes of activated groups at certain state.
-type CURGROUPS = [Int]
-
 -- | State contains identificator, character and non-deterministic finite
 -- automata (which is list of states). State derives Show class.
 -- States are equal if they have the same identificator. For determining
@@ -99,66 +92,72 @@ grp ms = ms
 accept :: NFA -> Bool
 accept ds = 0 `elem` [i | (State i _ _) <- ds]
 
+-- Groups represent memory in which we store partial matches in regular
+-- expression. Since groups can be nested, we need indices of all currently
+-- active groups in which we add characters as we proceed.
+--
+-- Grups are ordered in reverse: string on i-th position corresponds to
+-- contents of (size - i - 1)-th group.
+--
+--             .--- Number of groups in memory
+--             |     .--- Content of each group
+--             |     |         .--- Currently active groups
+type Groups = (Int, [String], [Int])
 
--- | Define new group. Character is here just to simplify checkChar funciton. 
-newGroup :: GROUPS -> CURGROUPS -> (GROUPS, CURGROUPS, String) 
--- First inserted group
-newGroup (_,[]) _ = ((1, [""]), [0], "")
--- Later added groups
-newGroup (n, xs) curGroup = 
-	(((n+1), "":xs), n:curGroup, "")
-	
-ng = newGroup (3,["a", "b", "c"]) [2,0] 	
--- | Close group
-closeGroup :: GROUPS -> CURGROUPS -> (GROUPS, CURGROUPS, String)
-closeGroup group (x:xs) = (group, xs, "") 
+-- Add new group to memory. This happens when we encounter start of the
+-- group in regular expression. Newly created group is marked as active.
+addGroup :: Groups -> (Groups, String)
+addGroup (n, gs, as) = ((n + 1, "" : gs, n : as), "")
+ng = addGroup (3, ["a", "b", "c"], [2,0])
 
--- | Add into groups
-addToGroups :: GROUPS -> CURGROUPS -> Char -> GROUPS
-addToGroups groups [] _ = groups
-addToGroups (n, y:ys) (x:xs) c =
-	let
-		i = n - x - 1
-		(_, zs) = addToGroups (n-1, ys) (if i == 0 then xs else x:xs) c
-	in
-		if i == 0 then (n, (y++[c]):zs)	else (n, y:zs)
+-- Close group. This action is triggered when we encounter end of group
+-- marker in regular expression.
+closeGroup :: Groups -> (Groups, String)
+closeGroup (n, gs, a : as) = ((n, gs, as), "")
 
--- test addToGroups		
-atg = addToGroups (3,["a", "b", "c"]) [2,0] 'c'
+-- Insert character into all active groups.
+insert :: Groups -> Char -> Groups
+insert g @ (n, gs, as) c = (n, insert' g c [], as)
+  where insert' (_, [], _) _ acc = reverse acc
+        insert' (n, g : gs, a : as) c acc =
+          if n - a - 1 == 0
+             then insert' (n - 1, gs, as) c ((g ++ [c]) : acc)
+             else insert' (n - 1, gs, a : as) c (g : acc)
+atg = insert (3, ["a", "b", "c"], [2,0]) 'c'
 
--- | Get group 
-getGroup :: GROUPS -> Int -> String
-getGroup (len,x:xs) n =
-	if len - n - 1 == 0 then x else getGroup (len-1, xs) n  
+-- | Get group
+getGroup :: Groups -> Int -> String
+getGroup (len, gs, _) n = gs !! (len - n - 1)
+gg1 = getGroup (3, ["a", "b", "c"], [2,0]) 0
+gg2 = getGroup (3, ["a", "b", "c"], [2,0]) 2
 
 -- | If character is digit it returns group with id of the digit otherwise it returns input character.
 -- If character is not a special character then it's added to all grouops it's located.
-checkChar :: GROUPS -> CURGROUPS -> Char -> (GROUPS, CURGROUPS, String)
-checkChar groups curgroups c =
+checkChar :: Groups -> Char -> (Groups, String)
+checkChar groups c =
 	if isDigit c
 	-- if digit then return group
-	then (groups, curgroups, getGroup groups ((digitToInt c) - 1))
+	then (groups, getGroup groups ((digitToInt c) - 1))
 	-- if '(' then start new group
-	else if c == '<' then newGroup groups curgroups
+	else if c == '<' then addGroup groups
 	-- if ')' then close last group
-	else if c == '>' then closeGroup groups curgroups
-	else 
-		let groups' = addToGroups groups curgroups c in (groups', curgroups, [c])
+	else if c == '>' then closeGroup groups
+	else (insert groups c, [c])
 
 -- test checkChar	
-cc = checkChar (2, ["ac", "bc"]) [1] '1'
+cc = checkChar (2, ["ac", "bc"], [1]) '1'
 
 -- | Generates length ordered list of strings from automata.
-visit :: [(String,NFA,GROUPS,CURGROUPS)] -> [String]
+visit :: [(String, NFA, Groups)] -> [String]
 visit [] = []
-visit ((x,ds,groups, curgroups):ws) =
-  -- x = a word, 
-  -- ds = destination states, where we can go at this point, 
+visit ((x, ds, groups) : ws) =
+  -- x = a word,
+  -- ds = destination states, where we can go at this point,
   -- grp helps us to extract those dest. states
   -- [ ] = list of (word+c, ds'), where c is character
   -- visit -> ws+[ ]
   -- xs = list of valid words
-  let xs = visit (ws ++ [(x++s',ds',groups', curgroups') | (State _ c ds') <- grp ds, (groups', curgroups', s') <- [checkChar groups curgroups c] ])
+  let xs = visit (ws ++ [(x++s',ds',groups') | (State _ c ds') <- grp ds, (groups', s') <- [checkChar groups c] ])
   -- returns list of x
   -- returns list of words (because x = word)
   in if accept ds then x:xs else xs
@@ -184,7 +183,7 @@ deNil x = x
 	
 -- | Properly initialise visit call. It starts with empty word.
 enumNFA :: NFA -> [String]
-enumNFA starts = visit [("", starts, (0,[]), [])]
+enumNFA starts = visit [("", starts, (0, [], []))]
 
 -- | Enumerate regular expression, passed in as a 'String'.
 --
