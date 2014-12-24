@@ -19,7 +19,7 @@ module Enumerator
 import Parser
 import Data.Char
 
-infixr 5 +++   -- catenate LOL data
+--infixr 5 +++   -- catenate LOL data
 infixl 6 \/    -- set union
 
 -- | Type for non-deterministic finite automata is list of states.
@@ -47,18 +47,6 @@ instance Ord State where
 -- | NFA states are labeled with integers.
 type Ident = Int
 
--- | Length-ordered list. Shorter lists come before longer lists when sorting.
-data LOL a = LOL [a] deriving (Eq, Show)
-instance Ord a => Ord (LOL a) where
-  LOL x <= LOL y = (length x, x) <= (length y, y)
-
--- | Concatenation of length ordered lists.
-(+++) :: LOL a -> LOL a -> LOL a
-LOL x +++ LOL y = LOL (x++y)			
-			
--- | Length-ordered string. Specialization of LOL. 		
-type LOS = LOL Char				
-	
 -- | Union where elements are sorted by length and lexicographically.	
 (\/) :: Ord a => [a] -> [a] -> [a]
 [] \/ ys = ys
@@ -69,33 +57,6 @@ xs@(x:xt) \/ ys@(y:yt) =
     EQ -> x : xt \/ yt
     GT -> y : xs \/ yt
 
--- | General crossproduct of two list with a given function.
-xprod :: (Ord a, Ord b, Ord c) => (a -> b -> c) -> [a] -> [b] -> [c]
-xprod _ [] _ = []
-xprod _ _ [] = []
-xprod f (x : xt) ys@(y : yt) =
-  f x y : xprod f [x] yt \/ xprod f xt ys
-
--- | Closure.	
-closure :: Ord a => (a -> a -> a) -> a -> [a] -> [a]
-closure f z [] = [z]
-closure f z xs@(x : xt) =
-  if x == z
-     then closure f z xt
-     else z : xprod f xs (closure f z xs)
-
--- | OR operator.	
-alt :: [LOS] -> [LOS] -> [LOS]
-alt = (\/)
-
--- | Sequencing.
-cat :: [LOS] -> [LOS] -> [LOS]
-cat = xprod (+++)
-
--- | Closure operator.
-clo :: [LOS] -> [LOS]
-clo = closure (+++) (LOL "")	
-	
 -- | Bypass check function.
 bp :: Bool -> NFA -> NFA
 bp True ds = ds
