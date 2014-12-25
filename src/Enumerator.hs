@@ -18,11 +18,23 @@ module Enumerator
 
 import Parser
 import Data.Char
+import Data.Maybe
 
---infixr 5 +++   -- catenate LOL data
-infixl 6 \/    -- set union
+infixl 6 \/
 
--- | Type for non-deterministic finite automata is list of states.
+-- | Ordered union operation. It takes 2 ordered lists and returns
+-- ordered union. If inputs are not already sorted, sort order of
+-- results in undefined.
+(\/) :: Ord a => [a] -> [a] -> [a]
+[] \/ ys = ys
+xs \/ [] = xs
+xs @ (x : xt) \/ ys @ (y : yt) =
+  case compare x y of
+    LT -> x : xt \/ ys
+    EQ -> x : xt \/ yt
+    GT -> y : xs \/ yt
+
+-- | Non-deterministic finite automata data type.
 type NFA = [State]
 
 -- | Datatype, representing NFA state and transitions from this state.
@@ -46,15 +58,6 @@ instance Ord State where
 -- | NFA states are labeled with integers.
 type Ident = Int
 
--- | Union where elements are sorted by length and lexicographically.	
-(\/) :: Ord a => [a] -> [a] -> [a]
-[] \/ ys = ys
-xs \/ [] = xs
-xs@(x:xt) \/ ys@(y:yt) =
-  case compare x y of
-    LT -> x : xt \/ ys
-    EQ -> x : xt \/ yt
-    GT -> y : xs \/ yt
 -- | Actions that can be executed when we visit states in NFA.
 data Action = Symbol Char -- ^Append character to existing word
             | Open        -- ^Add new group to memory
@@ -68,8 +71,7 @@ bp :: Bool -> NFA -> NFA
 bp True ds = ds
 bp False _ = []
 
--- | Function which determines starting state which is actually set as
--- destination state.
+-- | Convert regular expression into non-deterministic finite automaton.
 rexp2nfa :: Rexp -> NFA
 rexp2nfa r = fs \/ bp b ds
   where ds = [State 0 None []];
@@ -115,7 +117,7 @@ grp ms = ms
 accept :: NFA -> Bool
 accept ds = None `elem` [a | (State _ a _) <- ds]
 
--- Groups represent memory in which we store partial matches in regular
+-- | Groups represent memory in which we store partial matches in regular
 -- expression. Since groups can be nested, we need indices of all currently
 -- active groups in which we add characters as we proceed.
 --
@@ -127,66 +129,62 @@ accept ds = None `elem` [a | (State _ a _) <- ds]
 --             |     |         .--- Currently active groups
 type Groups = (Int, [String], [Int])
 
--- Add new group to memory. This happens when we encounter start of the
+-- | Add new group to memory. This happens when we encounter start of the
 -- group in regular expression. Newly created group is marked as active.
-addGroup :: Groups -> (Groups, String)
-addGroup (n, gs, as) = ((n + 1, "" : gs, n : as), "")
+addGroup :: Groups -> Groups
+addGroup (n, gs, as) = (n + 1, "" : gs, n : as)
 ng = addGroup (3, ["a", "b", "c"], [2,0])
 
--- Close group. This action is triggered when we encounter end of group
+-- | Close group. This action is triggered when we encounter end of group
 -- marker in regular expression.
-closeGroup :: Groups -> (Groups, String)
-closeGroup (n, gs, a : as) = ((n, gs, as), "")
+closeGroup :: Groups -> Groups
+closeGroup (n, gs, _ : as) = (n, gs, as)
 
--- Insert character into all active groups.
+-- | Insert character into all active groups.
 insert :: Groups -> Char -> Groups
 insert g @ (n, gs, as) c = (n, insert' g c [], as)
   where insert' (_, [], _) _ acc = reverse acc
+        insert' (_, g, []) _ acc = reverse acc ++ g
         insert' (n, g : gs, a : as) c acc =
           if n - a - 1 == 0
              then insert' (n - 1, gs, as) c ((g ++ [c]) : acc)
              else insert' (n - 1, gs, a : as) c (g : acc)
 atg = insert (3, ["a", "b", "c"], [2,0]) 'c'
 
--- | Get group
-getGroup :: Groups -> Int -> String
-getGroup (len, gs, _) n = gs !! (len - n - 1)
+-- | Obtain string that belongs to nth group. If nth group does not exist,
+-- Nothing is returned.
+--
+-- WARNING: as per standard notation, indicies of groups in regular expression
+-- start with 1! This is taken into consideration in (len - n) expression.
+getGroup :: Groups -> Int -> Maybe String
+getGroup (len, gs, _) n =
+  if n > len || n < 1
+     then Nothing
+     else Just $ gs !! (len - n)
 gg1 = getGroup (3, ["a", "b", "c"], [2,0]) 0
 gg2 = getGroup (3, ["a", "b", "c"], [2,0]) 2
 
--- | If character is digit it returns group with id of the digit otherwise it returns input character.
--- If character is not a special character then it's added to all grouops it's located.
-checkChar :: Groups -> Char -> (Groups, String)
-checkChar groups c =
-	if isDigit c
-	-- if digit then return group
-	then (groups, getGroup groups ((digitToInt c) - 1))
-	-- if '(' then start new group
-	else if c == '<' then addGroup groups
-	-- if ')' then close last group
-	else if c == '>' then closeGroup groups
-	else (insert groups c, [c])
-
--- test checkChar	
-cc = checkChar (2, ["ac", "bc"], [1]) '1'
-
--- | Generates length ordered list of strings from automata.
+-- | Visit function is main engine of enumerator. It first checks if current
+-- word is accepted by automaton and inserts it into returned list. The tail
+-- of result is then generated recursivelly by applying action to current
+-- word and moving to next state.
 visit :: [(String, NFA, Groups)] -> [String]
 visit [] = []
-visit ((x, ds, groups) : ws) =
-  -- x = a word,
-  -- ds = destination states, where we can go at this point,
-  -- grp helps us to extract those dest. states
-  -- [ ] = list of (word+c, ds'), where c is character
-  -- visit -> ws+[ ]
-  -- xs = list of valid words
-  let xs = visit (ws ++ [(x++s',ds',groups') | (State _ c ds') <- grp ds, (groups', s') <- [checkChar groups c] ])
-  -- returns list of x
-  -- returns list of words (because x = word)
-  in if accept ds then x:xs else xs
+visit ((x, ds, groups) : ws) = if accept ds then x : xs else xs
+  where xs = visit (ws ++ catMaybes [genNextState x s groups | s <- grp ds])
 
--- | Removes different production of the same length words. Makes parsing more
--- efficient.
+-- | Generate next state (update currently constructed word and memory).
+genNextState :: String -> State -> Groups -> Maybe (String, NFA, Groups)
+genNextState word (State _ a ds) groups =
+  case a of
+    Symbol c -> Just (word ++ [c], ds, insert groups c)
+    Open     -> Just (word, ds, addGroup groups)
+    Close    -> Just (word, ds, closeGroup groups)
+    None     -> Just (word, ds, groups) -- Should newer be executed
+    Ref n    -> getGroup groups n >>= \s -> return (word ++ s, ds, groups)
+
+-- | deNil removes different production of the same length words. Makes
+-- generating more efficient.
 deNil :: Rexp -> Rexp
 deNil (Cat x y) =
   case (deNil x, deNil y) of
@@ -202,9 +200,10 @@ deNil (Clo x) =
   case deNil x of
     Nil -> Eps
     x' -> Clo x'
-deNil x = x	
-	
--- | Properly initialise visit call. It starts with empty word.
+deNil x = x
+
+-- | Properly initialise visit call. It starts with empty word, to which char
+-- will be added, and empty memory.
 enumNFA :: NFA -> [String]
 enumNFA starts = visit [("", starts, (0, [], []))]
 
