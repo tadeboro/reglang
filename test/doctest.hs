@@ -3,4 +3,4 @@ module Main where
 import Test.DocTest
 
 main :: IO ()
-main = doctest ["src/Parser.hs", "src/Enumerator.hs"]
+main = doctest ["-isrc", "src/Parser.hs", "src/Enumerator.hs"]

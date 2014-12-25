@@ -13,7 +13,9 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Enumerator,
-                     Parser
+                     Enumerator.Internal,
+                     Parser,
+                     Parser.Internal
   build-depends:     base,
                      parsec
   hs-source-dirs:    src
