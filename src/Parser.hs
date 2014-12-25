@@ -21,6 +21,7 @@ module Parser
 import Text.ParserCombinators.Parsec
 import Control.Monad
 import Control.Applicative ((<*))
+import Data.Char
 
 -- | Constructors for regular expressions.
 data Rexp = Nil               -- ^Empty language
@@ -29,12 +30,15 @@ data Rexp = Nil               -- ^Empty language
           | Clo Rexp          -- ^Kleene closure
           | Cat Rexp Rexp     -- ^Catenation
           | Alt Rexp Rexp     -- ^Alternation
-            deriving (Show,Eq,Ord)
+	  | Group Rexp        -- ^Group operation
+	  | GroupRef Int      -- ^Group reference operation
+            deriving (Show, Eq, Ord)
 
 -- Characters that can be used in regular expressions
 charClass = " !\"#$%&'()*+,-./0123456789:;<=>?" ++
             "@ABCDEFGHIJKLMNOPQRSTUVWXZY[\\]^_" ++
             "`abcdefghijklmnopqrstuvwxzy{|}~"
+specialChars = "().|\\?*+"
 anyExpr = foldl1 Alt $ map Sym charClass
 
 -- Parser (and grammar)
@@ -68,10 +72,10 @@ baseP = choice [groupP, symP, anyP, escP]
 groupP = do char '('
             e <- exprP
             char ')'
-            return $ Cat (Sym '<') (Cat e (Sym '>'))
+            return $ Group e
 
 -- Symbols in regex
-symP = liftM Sym $ noneOf "().|\\?*+"
+symP = liftM Sym $ noneOf specialChars
 
 -- Wildcard character
 anyP :: GenParser Char st Rexp
@@ -79,7 +83,13 @@ anyP = char '.' >> return anyExpr
 
 -- Escaped character
 escP :: GenParser Char st Rexp
-escP = char '\\' >> liftM Sym anyChar
+escP = try backrefP <|> charP
+  where backrefP = do char '\\'
+                      d <- digit
+		      return $ GroupRef (digitToInt d)
+        charP = do char '\\'
+	           c <- anyChar
+		   return $ Sym c
 
 -- Helper to display error position
 errMsg :: ParseError -> String
