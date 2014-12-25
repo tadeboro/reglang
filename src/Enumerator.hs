@@ -25,13 +25,19 @@ infixl 6 \/    -- set union
 -- | Type for non-deterministic finite automata is list of states.
 type NFA = [State]
 
--- | State contains identificator, character and non-deterministic finite
--- automata (which is list of states). State derives Show class.
--- States are equal if they have the same identificator. For determining
--- ordering of states, we compare their symbols first and after that the
--- identificators. That gives us words of equal lengths sorted in alphabetical
--- order.
-data State = State Ident Char NFA deriving Show
+-- | Datatype, representing NFA state and transitions from this state.
+-- State holds identifier, which makes it possible to compare two states
+-- easily; action, which happens when we enter this state; and NFA, which
+-- represents all possible transitions from this state.
+--
+-- States are ordered by action and then by identificator. This is done
+-- mainily because this ordering returns strings, produced by automaton,
+-- in alphabetical order.
+--
+-- When using groups and backreferences in regular expressions,
+-- alphabetical order is not quarateed and words of automaton will
+-- almost certainly be shuffled a bit.
+data State = State Ident Action NFA
 instance Eq State where
   (State i _ _) == (State i' _ _) = i == i'
 instance Ord State where
@@ -49,6 +55,13 @@ xs@(x:xt) \/ ys@(y:yt) =
     LT -> x : xt \/ ys
     EQ -> x : xt \/ yt
     GT -> y : xs \/ yt
+-- | Actions that can be executed when we visit states in NFA.
+data Action = Symbol Char -- ^Append character to existing word
+            | Open        -- ^Add new group to memory
+            | Close       -- ^Close most recently activated group
+            | Ref Int     -- ^Reference existing group
+            | None        -- ^Marker for final state
+            deriving (Ord, Eq)
 
 -- | Bypass check function.
 bp :: Bool -> NFA -> NFA
@@ -59,38 +72,48 @@ bp False _ = []
 -- destination state.
 rexp2nfa :: Rexp -> NFA
 rexp2nfa r = fs \/ bp b ds
-  where ds = [State 0 '~' []];
+  where ds = [State 0 None []];
         (fs, _, b) = rexp2nfa' r 1 ds
 
--- | Function takes regular expression, identifcator and destinations states.
--- Returns automat (seznam stanj) with meta informations (identificator,
--- bypass value).	
+-- | Perform single step of conversion from Rexp to NFA. Input of this
+-- function is regular expession to convert, next available identificator
+-- and destination states. Function returns set of starting states, next
+-- available state indetificator and bypass flag that signals, if this
+-- regular expression can produce empty string.
 rexp2nfa' :: Rexp -> Ident -> NFA -> (NFA, Ident, Bool)
-rexp2nfa' Nil       n _  = ([], n, False)
-rexp2nfa' Eps       n _  = ([], n, True)
-rexp2nfa' (Sym c)   n ds = ([State n c ds], succ n, False)
-rexp2nfa' (Cat x y) n ds = (fs' \/ bp b' fs, n'', b && b')
-  where (fs , n' , b ) = rexp2nfa' y n ds;
-        (fs', n'', b') = rexp2nfa' x n' (fs \/ bp b ds);
-rexp2nfa' (Alt x y) n ds = (fs \/ fs', n'', b || b')
-  where (fs , n' , b ) = rexp2nfa' y n ds;
-        (fs', n'', b') = rexp2nfa' x n' ds;
-rexp2nfa' (Clo x)   n ds = (fs, n', True)
-  where (fs, n', b) = rexp2nfa' x n (fs \/ ds)
-	
--- | It takes list of states and joins states with the same character. This
--- removes duplicated word production and accelerates speed of algorithm.
+rexp2nfa' Nil          n _  = ([], n, False)
+rexp2nfa' Eps          n _  = ([], n, True)
+rexp2nfa' (Sym c)      n ds = ([State n (Symbol c) ds], n + 1, False)
+rexp2nfa' (GroupRef x) n ds = ([State n (Ref x) ds], n + 1, False)
+rexp2nfa' (Cat x y)    n ds = (fs2 \/ bp b2 fs1, n2, b1 && b2)
+  where (fs1, n1, b1) = rexp2nfa' y n ds;
+        (fs2, n2, b2) = rexp2nfa' x n1 (fs1 \/ bp b1 ds);
+rexp2nfa' (Alt x y)    n ds = (fs1 \/ fs2, n2, b1 || b1)
+  where (fs1, n1, b1) = rexp2nfa' y n  ds;
+        (fs2, n2, b2) = rexp2nfa' x n1 ds;
+rexp2nfa' (Clo x)      n ds = (fs, n', True)
+  where (fs, n', _) = rexp2nfa' x n (fs \/ ds)
+rexp2nfa' (Group x)    n ds = (start, n' + 1, b)
+  where end = [State n Close ds]
+        (fs, n', b) = rexp2nfa' x (n + 1) end
+        start = [State n' Open fs]
+
+-- | Function that takes list of states and joins states with the same
+-- action. This removes duplicated word production and accelerates speed
+-- of algorithm, since transitions, which would produce exactly the same
+-- words, are joined together.
 grp :: NFA -> NFA
-grp (m@(State _ c ds) : ms@(State _ c' ds' : mt)) =
+grp (m @ (State _ c ds) : ms @ (State _ c' ds' : mt)) =
   if c == c'
      then grp (State (-1) c (ds \/ ds') : mt)
      else m : grp ms
 grp ms = ms
 
--- | Tells us if the word is part of automata language. State 0 is set as
--- the only final state.
+-- | Function that returns true if automaton accepts current word. This is
+-- determined by looking for None action, which indicates transition to
+-- end state.
 accept :: NFA -> Bool
-accept ds = 0 `elem` [i | (State i _ _) <- ds]
+accept ds = None `elem` [a | (State _ a _) <- ds]
 
 -- Groups represent memory in which we store partial matches in regular
 -- expression. Since groups can be nested, we need indices of all currently
@@ -212,15 +235,3 @@ enumerate regex = case parseRexp regex of
 -- ["","b","bb","bbb","bbbb"]
 enumerate1 :: Rexp -> [String]
 enumerate1 = enumNFA . rexp2nfa . deNil
-
-a = Sym 'a'
-b = Sym 'b'
-c = Sym 'c'
-p1 = Sym '('
-p2 = Sym ')'
-n1 = Sym '1'
-n2 = Sym '2'
-
-e = enumerate1
-g = Cat (Cat p1 (Cat (Clo a) p2)) n1
-g2 = Cat (Cat p1 (Cat ( Cat (Cat p1 (Cat (Clo a) p2)) b) p2)) n2
