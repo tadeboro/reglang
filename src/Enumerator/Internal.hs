@@ -139,14 +139,14 @@ closeGroup :: Groups -> Groups
 closeGroup (n, gs, _ : as) = (n, gs, as)
 
 -- | Insert character into all active groups.
-insert :: Groups -> Char -> Groups
-insert g @ (n, gs, as) c = (n, insert' g c [], as)
-  where insert' (_, [], _) _ acc = reverse acc
-        insert' (_, g, []) _ acc = reverse acc ++ g
-        insert' (n, g : gs, a : as) c acc =
+insert :: Groups -> String -> Groups
+insert g @ (n, gs, as) s = (n, insert' g [], as)
+  where insert' (_, [], _) acc = reverse acc
+        insert' (_, g, []) acc = reverse acc ++ g
+        insert' (n, g : gs, a : as) acc =
           if n - a - 1 == 0
-             then insert' (n - 1, gs, as) c ((g ++ [c]) : acc)
-             else insert' (n - 1, gs, a : as) c (g : acc)
+             then insert' (n - 1, gs, as) ((g ++ s) : acc)
+             else insert' (n - 1, gs, a : as) (g : acc)
 
 -- | Obtain string that belongs to nth group. If nth group does not exist,
 -- Nothing is returned.
@@ -172,11 +172,13 @@ visit ((x, ds, groups) : ws) = if accept ds then x : xs else xs
 genNextState :: String -> State -> Groups -> Maybe (String, NFA, Groups)
 genNextState word (State _ a ds) groups =
   case a of
-    Symbol c -> Just (word ++ [c], ds, insert groups c)
+    Symbol c -> Just (word ++ [c], ds, insert groups [c])
     Open     -> Just (word, ds, addGroup groups)
     Close    -> Just (word, ds, closeGroup groups)
     None     -> Just (word, ds, groups) -- Should newer be executed
-    Ref n    -> getGroup groups n >>= \s -> return (word ++ s, ds, groups)
+--    Ref n    -> getGroup groups n >>= \s -> return (word ++ s, ds, groups)
+    Ref n    -> do s <- getGroup groups n
+                   return (word ++ s, ds, insert groups s)
 
 -- | deNil removes different production of the same length words. Makes
 -- generating more efficient.

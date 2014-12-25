@@ -103,10 +103,10 @@ spec = do
 
     describe "Enumerator.Internal.insert" $ do
         it "inserts element into all active groups" $
-            insert (3, ["a", "b", "c"], [1, 0]) 'x' `shouldBe`
-              (3, ["a", "bx", "cx"], [1, 0])
+            insert (3, ["a", "b", "c"], [1, 0]) "xy" `shouldBe`
+              (3, ["a", "bxy", "cxy"], [1, 0])
         it "leaves non-active groups untouched" $
-            insert (3, ["a", "b", "c"], []) 'x' `shouldBe`
+            insert (3, ["a", "b", "c"], []) "x" `shouldBe`
               (3, ["a", "b", "c"], [])
 
     describe "Enumerator.Internal.getGroup" $ do
@@ -138,8 +138,8 @@ spec = do
               `shouldBe` Just ("a", ds, (3, ["a", "bc", "def"], [2]))
         it "appends group contents to word" $
             genNextState "a" (State 1 (Ref 1) ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Just ("adef", ds, (3, ["a", "bcdef", "def"], [2]))
+                         (3, ["a", "bc", "def"], [1])
+              `shouldBe` Just ("adef", ds, (3, ["a", "bcdef", "def"], [1]))
         it "reports missing group" $
             genNextState "a" (State 1 (Ref 5) ds)
                          (3, ["a", "bc", "def"], [2])
