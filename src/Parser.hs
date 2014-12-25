@@ -30,7 +30,7 @@ import Control.Applicative ((<*))
 -- Right (Cat (Cat (Cat (Sym 'A') (Sym 'b')) (Sym 'c')) (Sym 'd'))
 --
 -- >>> parseRexp "a(bc)?d"
--- Right (Cat (Cat (Sym 'a') (Alt Eps (Cat (Sym 'b') (Sym 'c')))) (Sym 'd'))
+-- Right (Cat (Cat (Sym 'a') (Alt Eps (Group (Cat (Sym 'b') (Sym 'c'))))) (Sym 'd'))
 --
 -- >>> parseRexp "ab+c"
 -- Right (Cat (Cat (Sym 'a') (Cat (Sym 'b') (Clo (Sym 'b')))) (Sym 'c'))
