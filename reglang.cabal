@@ -1,7 +1,7 @@
 name:                reglang
 version:             0.1.0.0
 synopsis:            Regular language enumerator
---description:         <add desc>
+description:         Regular language enumerator with some extensions
 license:             GPL-3
 license-file:        LICENSE
 author:              Aleš Omerzel, Tadej Borovšak
@@ -10,6 +10,10 @@ category:            Language
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
+
+source-repository head
+  type: git
+  location: https://github.com/tadeboro/reglang
 
 library
   exposed-modules:   Regex.Enumerator,
