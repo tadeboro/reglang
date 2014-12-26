@@ -34,15 +34,16 @@ import Regex.Parser
 -- >>> enumerate "?"
 -- Left "Error at line 1, column 1."
 enumerate :: String -> Either String [String]
-enumerate regex = case parseRexp regex of
-                  Left err -> Left err
-                  Right expr -> Right $ enumerate1 expr
+enumerate regex =
+  case parseRexp regex of
+    Left err -> Left err
+    Right (expr, n) -> Right $ enumerate1 n expr
 
 -- | Enumerate regular expression, passed in as a 'Rexp'. Proper
 -- representation can be obtained from string using 'parseRexp'
 -- function.
 --
--- >>> take 5 $ enumerate1 $ Clo (Sym 'b')
+-- >>> take 5 $ enumerate1 0 $ Clo (Sym 'b')
 -- ["","b","bb","bbb","bbbb"]
-enumerate1 :: Rexp -> [String]
-enumerate1 = enumNFA . rexp2nfa . deNil
+enumerate1 :: Int -> Rexp -> [String]
+enumerate1 n = enumNFA n . rexp2nfa . deNil

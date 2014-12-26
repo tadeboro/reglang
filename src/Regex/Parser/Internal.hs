@@ -37,7 +37,7 @@ data Rexp = Nil               -- ^Empty language
           | Clo Rexp          -- ^Kleene closure
           | Cat Rexp Rexp     -- ^Catenation
           | Alt Rexp Rexp     -- ^Alternation
-          | Group Rexp        -- ^Group operation
+          | Group Int Rexp    -- ^Group operation
           | GroupRef Int      -- ^Group reference operation
             deriving (Show, Eq, Ord)
 
@@ -63,7 +63,10 @@ anyExpr :: Rexp
 anyExpr = foldl1 Alt $ map Sym allChars
 
 -- Parsers for parts of regular expression
-exprP = altP
+exprP = do e <- altP
+           n <- getState
+           eof
+           return (e, n)
 
 altP = catP `chainl1` op
   where op = char '|' >> return Alt
@@ -85,9 +88,11 @@ repP = try zeromoreP <|> try zerooneP <|> try onemoreP <|> baseP
 baseP = choice [groupP, symP, anyP, escP]
 
 groupP = do char '('
-            e <- exprP
+            n <- getState
+            updateState (+1)
+            e <- altP
             char ')'
-            return $ Group e
+            return $ Group n e
 
 symP = liftM Sym $ oneOf normalChars
 
@@ -96,7 +101,7 @@ anyP = char '.' >> return anyExpr
 escP = try backrefP <|> charP
   where backrefP = do char '\\'
                       d <- digit
-                      return $ GroupRef (digitToInt d)
+                      return $ GroupRef (digitToInt d - 1)
         charP = do char '\\'
                    c <- oneOf specialChars
                    return $ Sym c

@@ -7,7 +7,7 @@ import Control.Applicative ((<*))
 import Text.ParserCombinators.Parsec
 
 -- Test runner that returns Left Int or Right Rexp
-run p s = case parse (p <* eof) "" s of
+run p s = case runParser (p <* eof) 0 "" s of
                Left e -> Left $ sourceColumn . errorPos $ e
                Right r -> Right r
 
@@ -34,7 +34,7 @@ spec = do
         it "parses escaped special chars into regular ones" $
             run escP "\\." `shouldBe` Right (Sym '.')
         it "parses escaped digits into backreferences" $
-            run escP "\\4" `shouldBe` Right (GroupRef 4)
+            run escP "\\4" `shouldBe` Right (GroupRef 3)
         it "reports error if doesnt get exactly 2 chars" $
             run escP "\\" `shouldBe` Left 2
         it "reports error on invalid first char" $
@@ -44,7 +44,7 @@ spec = do
 
     describe "Parser.Internal.groupP" $ do
         it "parses groups, eclosed in '(' and ')'" $
-            run groupP "(a)" `shouldBe` Right (Group (Sym 'a'))
+            run groupP "(a)" `shouldBe` Right (Group 0 (Sym 'a'))
         it "reports error id first char is not '('" $
             run groupP "b" `shouldBe` Left 1
         it "reports error on missing ')'" $
@@ -54,7 +54,7 @@ spec = do
 
     describe "Parser.Internal.baseP" $ do
         it "parses group" $
-            run baseP "(a)" `shouldBe` Right (Group (Sym 'a'))
+            run baseP "(a)" `shouldBe` Right (Group 0 (Sym 'a'))
         it "parses single normal character" $
             run baseP "b" `shouldBe` Right (Sym 'b')
         it "parses '.' as alternation of all ASCII chars" $
@@ -98,13 +98,13 @@ spec = do
     describe "Parser.Internal.exprP" $ do
         it "parses any valid regular expression" $
             run exprP "(a|b)\\1?" `shouldBe`
-              Right (Cat (Group (Alt (Sym 'a') (Sym 'b')))
-                         (Alt Eps (GroupRef 1)))
+              Right (Cat (Group 0 (Alt (Sym 'a') (Sym 'b')))
+                         (Alt Eps (GroupRef 0)), 1)
         it "reports error on malformed expressions" $
             run exprP "(a|b)\\1?*def" `shouldBe` Left 9
 
     describe "Parser.parseRexp" $ do
         it "parses any valid regular expression" $
             parseRexp "(a|b)\\1?" `shouldBe`
-              Right (Cat (Group (Alt (Sym 'a') (Sym 'b')))
-                         (Alt Eps (GroupRef 1)))
+              Right (Cat (Group 0 (Alt (Sym 'a') (Sym 'b')))
+                         (Alt Eps (GroupRef 0)), 1)

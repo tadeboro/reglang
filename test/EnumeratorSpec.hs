@@ -20,11 +20,15 @@ unionProp (UpList xs) (UpList ys) =
   xs \/ ys == sort (xs `union` ys)
 
 -- Dummy NFA that serves as list of destination states in test
-ds = [State 0 None [], State 1 (Symbol 'a') [State 0 None []]]
+ds = [State 0 Accept [], State 1 (Symbol 'a') [State 0 Accept []]]
 -- Regex that produces upper NFA
 re = Alt Eps (Sym 'a')
 -- String representation of re
 rs = "a?"
+-- Dummy contents of 3 groups
+dg = [Just "a", Nothing, Just "c"]
+da = [True, False, True]
+dm = (dg, da)
 
 -- Tests
 spec :: Spec
@@ -34,15 +38,17 @@ spec = do
 
     describe "Enumerator.Internal.bp" $ do
         it "returns destinations states when bypassable" $
-            bp True [State 0 None []] `shouldBe` [State 0 None []]
+            bp True [State 0 Accept []] `shouldBe` [State 0 Accept []]
         it "returns empty NFA when not bypassable" $
-            bp False [State 0 None []] `shouldBe` []
+            bp False [State 0 Accept []] `shouldBe` []
 
     describe "Enumerator.Internal.rexp2nfa'" $ do
         it "returns empty, non-bypassable NFA from empty language" $
-            rexp2nfa' Nil 3 ds `shouldBe` ([], 3, False)
+            rexp2nfa' Nil 3 ds `shouldBe`
+              ([], 3, False)
         it "returns empty, bypassable NFA from empty symbol" $
-            rexp2nfa' Eps 3 ds `shouldBe` ([], 3, True)
+            rexp2nfa' Eps 3 ds `shouldBe`
+              ([], 3, True)
         it "returns single new state from symbol" $
             rexp2nfa' (Sym 'a') 3 ds `shouldBe`
               ([State 3 (Symbol 'a') ds], 4, False)
@@ -65,11 +71,12 @@ spec = do
             rexp2nfa' (Alt (Sym 'b') (Sym 'a')) 3 ds `shouldBe`
               ([State 3 (Symbol 'a') ds, State 4 (Symbol 'b') ds], 5, False)
         it "returns non-bypassable group" $
-            rexp2nfa' (Group (Sym 'b')) 2 ds `shouldBe`
-              ([State 4 Open [State 3 (Symbol 'b') [State 2 Close ds]]], 5, False)
+            rexp2nfa' (Group 0 (Sym 'b')) 2 ds `shouldBe`
+              ([State 4 (Open 0) [State 3 (Symbol 'b') [State 2 (Close 0) ds]]],
+               5, False)
         it "returns bypassable group" $
-            rexp2nfa' (Group Eps) 2 ds `shouldBe`
-              ([State 3 Open [State 2 Close ds]] \/ ds, 4, True)
+            rexp2nfa' (Group 0 Eps) 2 ds `shouldBe`
+              ([State 3 (Open 0) [State 2 (Close 0) ds]] \/ ds, 4, True)
 
     describe "Enumerator.Internal.rexp2nfa" $ do
         it "returns final NFA for passed in regular expression" $
@@ -84,66 +91,64 @@ spec = do
               [State 1 (Symbol 'a') [], State 3 (Symbol 'b') []]
 
     describe "Enumerator.Internal.accept" $ do
-        it "accepts words that have None transition available" $
-            accept [State 1 (Symbol 'a') [], State 0 None []] `shouldBe` True
-        it "rejects words that have no None transition available" $
+        it "accepts words that have Accept transition available" $
+            accept [State 1 (Symbol 'a') [], State 0 Accept []] `shouldBe` True
+        it "rejects words that have no Accept transition available" $
             accept [State 1 (Symbol 'a') []] `shouldBe` False
 
-    describe "Enumerator.Internal.addGroup" $ do
-        it "creates new active group" $
-            addGroup (0, [], []) `shouldBe` (1, [""], [0])
-        it "creates new active group and leaves others in peace" $
-            addGroup (3, ["a", "b", "c"], [2, 0]) `shouldBe`
-              (4, ["", "a", "b", "c"], [3, 2, 0])
+    describe "Enumerator.Internal.initMemory" $ do
+        it "creates new memory and resets it" $
+            initMemory 2 `shouldBe` ([Nothing, Nothing], [False, False])
+        it "should not fail on creating empty memory" $
+            initMemory 0 `shouldBe` ([], [])
+
+    describe "Enumerator.Internal.resetGroup" $ do
+        it "does first time activation of group" $
+            resetGroup 1 ([Nothing, Nothing], [False, False]) `shouldBe`
+              ([Nothing, Just ""], [False, True])
+        it "resets already populated group and reactivates it" $
+            resetGroup 1 ([Nothing, Just "abc"], [False, False]) `shouldBe`
+              ([Nothing, Just ""], [False, True])
 
     describe "Enumerator.Internal.closeGroup" $ do
-        it "closes most recently opened group" $
-            closeGroup (3, ["a", "b", "c"], [2, 0]) `shouldBe`
-              (3, ["a", "b", "c"], [0])
+        it "closes selected group and makes it inactive" $
+            closeGroup 2 dm `shouldBe` (dg, [True, False, False])
 
     describe "Enumerator.Internal.insert" $ do
         it "inserts element into all active groups" $
-            insert (3, ["a", "b", "c"], [1, 0]) "xy" `shouldBe`
-              (3, ["a", "bxy", "cxy"], [1, 0])
+            insert "xy" dm `shouldBe` ([Just "axy", Nothing, Just "cxy"], da)
         it "leaves non-active groups untouched" $
-            insert (3, ["a", "b", "c"], []) "x" `shouldBe`
-              (3, ["a", "b", "c"], [])
+            insert "x" ([Just "a"], [False]) `shouldBe` ([Just "a"], [False])
 
     describe "Enumerator.Internal.getGroup" $ do
         it "obtains existing group content 1" $
-            getGroup (3, ["a", "b", "c"], []) 2 `shouldBe` Just "b"
+            getGroup 1 dm `shouldBe` Nothing
         it "obtains existing group content 2" $
-            getGroup (3, ["a", "b", "c"], []) 3 `shouldBe` Just "a"
+            getGroup 2 dm `shouldBe` Just "c"
         it "reports non-existing group 1" $
-            getGroup (3, ["a", "b", "c"], []) 0 `shouldBe` Nothing
+            getGroup (-1) dm `shouldBe` Nothing
         it "reports non-existing group 2" $
-            getGroup (3, ["a", "b", "c"], []) 6 `shouldBe` Nothing
+            getGroup 6 dm `shouldBe` Nothing
 
     describe "Enumerator.Internal.genNextState" $ do
         it "appends simbol to existing word" $
-            genNextState "a" (State 1 (Symbol 'b') ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Just ("ab", ds, (3, ["ab", "bc", "def"], [2]))
+            genNextState "a" (State 1 (Symbol 'b') ds) dm `shouldBe`
+              Just ("ab", ds, ([Just "ab", Nothing, Just "cb"], da))
         it "opens new group" $
-            genNextState "a" (State 1 Open ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Just ("a", ds, (4, ["", "a", "bc", "def"], [3, 2]))
-        it "closes most recently activated group" $
-            genNextState "a" (State 1 Close ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Just ("a", ds, (3, ["a", "bc", "def"], []))
+            genNextState "a" (State 1 (Open 0) ds) dm `shouldBe`
+              Just ("a", ds, ([Just "", Nothing, Just "c"], da))
+        it "closes selected group and deactivates it" $
+            genNextState "a" (State 1 (Close 2) ds) dm `shouldBe`
+              Just ("a", ds, (dg, [True, False, False]))
         it "does nothing" $
-            genNextState "a" (State 1 None ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Just ("a", ds, (3, ["a", "bc", "def"], [2]))
+            genNextState "a" (State 1 Accept ds) dm `shouldBe`
+              Just ("a", ds, dm)
         it "appends group contents to word" $
-            genNextState "a" (State 1 (Ref 1) ds)
-                         (3, ["a", "bc", "def"], [1])
-              `shouldBe` Just ("adef", ds, (3, ["a", "bcdef", "def"], [1]))
+            genNextState "a" (State 1 (Ref 0) ds) dm `shouldBe`
+              Just ("aa", ds, ([Just "aa", Nothing, Just "ca"], da))
         it "reports missing group" $
-            genNextState "a" (State 1 (Ref 5) ds)
-                         (3, ["a", "bc", "def"], [2])
-              `shouldBe` Nothing
+            genNextState "a" (State 1 (Ref 5) ds) dm `shouldBe`
+              Nothing
 
     describe "Enumerator.enumerate" $ do
         it "lists all words of regular language 1" $
@@ -155,4 +160,4 @@ spec = do
 
     describe "Enumerator.enumerate1" $ do
         it "lists all words of regular language 1" $
-            enumerate1 re `shouldBe` ["", "a"]
+            enumerate1 0 re `shouldBe` ["", "a"]
