@@ -58,10 +58,10 @@ instance Ord State where
 type Ident = Int
 
 -- | Actions that can be executed when we visit states in NFA.
-data Action = None        -- ^Marker for final state
+data Action = Accept      -- ^Marker for final state
             | Symbol Char -- ^Append character to existing word
-            | Open        -- ^Add new group to memory
-            | Close       -- ^Close most recently activated group
+            | Open Int    -- ^Reset nth group for new round of insertions
+            | Close Int   -- ^Close nth group
             | Ref Int     -- ^Reference existing group
             deriving (Ord, Eq, Show)
 
@@ -73,7 +73,7 @@ bp False _ = []
 -- | Convert regular expression into non-deterministic finite automaton.
 rexp2nfa :: Rexp -> NFA
 rexp2nfa r = fs \/ bp b ds
-  where ds = [State 0 None []];
+  where ds = [State 0 Accept []];
         (fs, _, b) = rexp2nfa' r 1 ds
 
 -- | Perform single step of conversion from Rexp to NFA. Input of this
@@ -94,10 +94,10 @@ rexp2nfa' (Alt x y)    n ds = (fs1 \/ fs2, n2, b1 || b2)
         (fs2, n2, b2) = rexp2nfa' x n1 ds;
 rexp2nfa' (Clo x)      n ds = (fs, n', True)
   where (fs, n', _) = rexp2nfa' x n (fs \/ ds)
-rexp2nfa' (Group x)    n ds = (start \/ bp b ds, n' + 1, b)
-  where end = [State n Close ds]
+rexp2nfa' (Group id x) n ds = (start \/ bp b ds, n' + 1, b)
+  where end = [State n (Close id) ds]
         (fs, n', b) = rexp2nfa' x (n + 1) end
-        start = [State n' Open (fs \/ bp b end)]
+        start = [State n' (Open id) (fs \/ bp b end)]
 
 -- | Function that takes list of states and joins states with the same
 -- action. This removes duplicated word production and accelerates speed
@@ -111,74 +111,72 @@ grp (m @ (State _ c ds) : ms @ (State _ c' ds' : mt)) =
 grp ms = ms
 
 -- | Function that returns true if automaton accepts current word. This is
--- determined by looking for None action, which indicates transition to
+-- determined by looking for Accept action, which indicates transition to
 -- end state.
 accept :: NFA -> Bool
-accept ds = None `elem` [a | (State _ a _) <- ds]
+accept ds = Accept `elem` [a | (State _ a _) <- ds]
 
--- | Groups represent memory in which we store partial matches in regular
--- expression. Since groups can be nested, we need indices of all currently
--- active groups in which we add characters as we proceed.
+-- | Memory represent memory in which we store partial matches in regular
+-- expression. Since groups can be nested, we need a mask that tells us which
+-- groups are currently active.
 --
--- Grups are ordered in reverse: string on i-th position corresponds to
--- contents of (size - i - 1)-th group.
---
---             .--- Number of groups in memory
---             |     .--- Content of each group
---             |     |         .--- Currently active groups
-type Groups = (Int, [String], [Int])
+-- If group hasn't been yet activated (it's activation state in NFA hasn't
+-- been visited yet), contents is Nothing.
+type Memory = ([Maybe String], [Bool])
+--              |               '--- Mask of currently active groups
+--              '--- Content of each group
 
--- | Add new group to memory. This happens when we encounter start of the
--- group in regular expression. Newly created group is marked as active.
-addGroup :: Groups -> Groups
-addGroup (n, gs, as) = (n + 1, "" : gs, n : as)
+-- | Funtion that allocates and initializes memory for n grops. All memory
+-- locations (or groups) are initialy set to hold Nothing and to be inactive.
+initMemory :: Int -> Memory
+initMemory n = (replicate n Nothing, replicate n False)
+
+-- | Function that resets memory of nth group and marks it active.
+-- FIXME: This is really bad implementation, but should be OK for start
+resetGroup :: Int -> Memory -> Memory
+resetGroup n (gs, as) =
+  (take n gs ++ [Just ""] ++ drop (n + 1) gs,
+   take n as ++ [True]    ++ drop (n + 1) as)
 
 -- | Close group. This action is triggered when we encounter end of group
 -- marker in regular expression.
-closeGroup :: Groups -> Groups
-closeGroup (n, gs, _ : as) = (n, gs, as)
+-- FIXME: Again, really bad implementation
+closeGroup :: Int -> Memory -> Memory
+closeGroup n (gs, as) = (gs, take n as ++ [False] ++ drop (n + 1) as)
 
--- | Insert character into all active groups.
-insert :: Groups -> String -> Groups
-insert g @ (n, gs, as) s = (n, insert' g [], as)
-  where insert' (_, [], _) acc = reverse acc
-        insert' (_, g, []) acc = reverse acc ++ g
-        insert' (n, g : gs, a : as) acc =
-          if n - a - 1 == 0
-             then insert' (n - 1, gs, as) ((g ++ s) : acc)
-             else insert' (n - 1, gs, a : as) (g : acc)
+-- | Append string onto all active groups.
+insert :: String -> Memory -> Memory
+insert s (gs, as) = (insert' gs as [], as)
+  where insert' [] [] acc = reverse acc
+        insert' (g : gs) (a : as) acc =
+          if a
+            then insert' gs as (Just (fromJust g ++ s) : acc)
+            else insert' gs as (g : acc)
 
--- | Obtain string that belongs to nth group. If nth group does not exist,
--- Nothing is returned.
---
--- WARNING: as per standard notation, indicies of groups in regular expression
--- start with 1! This is taken into consideration in (len - n) expression.
-getGroup :: Groups -> Int -> Maybe String
-getGroup (len, gs, _) n =
-  if n > len || n < 1
-     then Nothing
-     else Just $ gs !! (len - n)
+-- | Obtain string that belongs to nth group. If nth group has not been
+-- activated yet, Nothing is returned.
+getGroup :: Int -> Memory -> Maybe String
+getGroup n (gs, _) = if n >= length gs || n < 0 then Nothing else gs !! n
 
 -- | Visit function is main engine of enumerator. It first checks if current
 -- word is accepted by automaton and inserts it into returned list. The tail
 -- of result is then generated recursivelly by applying action to current
 -- word and moving to next state.
-visit :: [(String, NFA, Groups)] -> [String]
+visit :: [(String, NFA, Memory)] -> [String]
 visit [] = []
-visit ((x, ds, groups) : ws) = if accept ds then x : xs else xs
-  where xs = visit (ws ++ catMaybes [genNextState x s groups | s <- grp ds])
+visit ((x, ds, memory) : ws) = if accept ds then x : xs else xs
+  where xs = visit (ws ++ catMaybes [genNextState x s memory | s <- grp ds])
 
 -- | Generate next state (update currently constructed word and memory).
-genNextState :: String -> State -> Groups -> Maybe (String, NFA, Groups)
-genNextState word (State _ a ds) groups =
+genNextState :: String -> State -> Memory -> Maybe (String, NFA, Memory)
+genNextState word (State _ a ds) memory =
   case a of
-    Symbol c -> Just (word ++ [c], ds, insert groups [c])
-    Open     -> Just (word, ds, addGroup groups)
-    Close    -> Just (word, ds, closeGroup groups)
-    None     -> Just (word, ds, groups) -- Should newer be executed
---    Ref n    -> getGroup groups n >>= \s -> return (word ++ s, ds, groups)
-    Ref n    -> do s <- getGroup groups n
-                   return (word ++ s, ds, insert groups s)
+    Symbol c -> Just (word ++ [c], ds, insert [c] memory)
+    Open n   -> Just (word, ds, resetGroup n memory)
+    Close n  -> Just (word, ds, closeGroup n memory)
+    Accept   -> Just (word, ds, memory) -- Should newer be executed
+    Ref n    -> do s <- getGroup n memory
+                   return (word ++ s, ds, insert s memory)
 
 -- | deNil removes different production of the same length words. Makes
 -- generating more efficient.
@@ -201,5 +199,5 @@ deNil x = x
 
 -- | Properly initialise visit call. It starts with empty word, to which char
 -- will be added, and empty memory.
-enumNFA :: NFA -> [String]
-enumNFA starts = visit [("", starts, (0, [], []))]
+enumNFA :: Int -> NFA -> [String]
+enumNFA n starts = visit [("", starts, initMemory n)]
