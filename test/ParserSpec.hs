@@ -1,7 +1,7 @@
 module ParserSpec where
 
-import Parser
-import Parser.Internal
+import Regex.Parser
+import Regex.Parser.Internal
 import Test.Hspec
 import Control.Applicative ((<*))
 import Text.ParserCombinators.Parsec

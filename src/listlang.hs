@@ -4,7 +4,7 @@ import System.Console.GetOpt
 import System.Environment (getArgs)
 import System.Exit
 import Control.Monad
-import Enumerator
+import Regex.Enumerator
 
 -- Flag data type
 data Options = Options

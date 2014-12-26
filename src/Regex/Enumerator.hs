@@ -11,13 +11,13 @@ Enumerate all words of regular language. This implementation lists shorter
 words before longer ones, ensuring that all words of a language are listed
 in finite amount of time. Words of the same length are sorted alphabetically.
 -}
-module Enumerator
+module Regex.Enumerator
   ( enumerate
   , enumerate1
   ) where
 
-import Enumerator.Internal
-import Parser
+import Regex.Enumerator.Internal
+import Regex.Parser
 
 -- | Enumerate regular expression, passed in as a 'String'.
 --

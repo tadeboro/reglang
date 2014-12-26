@@ -10,9 +10,9 @@ Stability   :  unstable
 This is private implementation file for enumerator and thus should not be
 used in application code. Use Enumerator module.
 -}
-module Enumerator.Internal where
+module Regex.Enumerator.Internal where
 
-import Parser
+import Regex.Parser
 import Data.Char
 import Data.Maybe
 

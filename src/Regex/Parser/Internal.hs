@@ -24,7 +24,7 @@ Grammar that parser uses (terminals are in double quotes):
 
 Functions ending in P are direct equivalents of grammar rules.
 -}
-module Parser.Internal where
+module Regex.Parser.Internal where
 
 import Text.ParserCombinators.Parsec
 import Control.Monad

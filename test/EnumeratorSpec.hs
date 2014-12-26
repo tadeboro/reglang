@@ -1,8 +1,8 @@
 module EnumeratorSpec where
 
-import Enumerator
-import Enumerator.Internal
-import Parser
+import Regex.Enumerator
+import Regex.Enumerator.Internal
+import Regex.Parser
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck hiding ((.&.))

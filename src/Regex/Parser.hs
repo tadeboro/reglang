@@ -13,12 +13,12 @@ by enumerator.
 Parser currently operates on ASCII strings and supports operators ".", "?",
 "*", "+", "()" and "|".
 -}
-module Parser
+module Regex.Parser
   ( Rexp(..)
   , parseRexp)
   where
 
-import Parser.Internal
+import Regex.Parser.Internal
 import Text.ParserCombinators.Parsec (parse, eof)
 import Control.Applicative ((<*))
 
