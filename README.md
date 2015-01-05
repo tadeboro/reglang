@@ -1,85 +1,76 @@
-Current project status:
+# Enumerator for (pseudo) regular languages
+
 [![Build Status](https://travis-ci.org/tadeboro/reglang.svg?branch=master)]
 (https://travis-ci.org/tadeboro/reglang)
 
+This project's aim is to build regular language enumerator that can be
+used when generating strings with specific layouts (often needed when
+testing text processing applications or creating text corpuses).
 
-- [x] Naštudiraj delovanje avtomata
-- [x] Napiši komentarje za delovanje avtomata
-- [ ] Definiraj datatype za drevo
-		- pomagajmo si s sintakso sml
-			datatype tree = NIL | Node (int, leftTree, rightTree)
-			datatype string = "" | znak @ string
-			
-- [ ] Popravi Kleene star za drevo
-- [ ] Kriterij za sortiranje:
-	- [ ] Sortiraj po številu vozlišč
-	- [ ] V vozlišču rekurzivno določimo število vozlišč v levem in desnem poddrevesu: ([4,0], [3,1], [2,2], [1,3], [0,4])
-	
-	- ne gre čez, ker lahko z lemo o napihovanju dokažemo, da ni konteksno neodvisna gramatika, torej se ne da narediti avtomat
 
-	
-Nova ideja nadaljevanja:
-CAPTURING GROUPS
-- regex z capturing groups  (http://www.regular-expressions.info/named.html)
-	- uporaba pomnilnika za shranjevanje vmesnih rezultatov (grup)
+## Inspiration
 
-- [x] OSNOVNA VERZIJA
-	- [x] dodaj nov konstruktor za regularni izraz, ki bo definiral novo grupo (neuporabno)
-	- [x] dodaj nov ukaz, ki bo kloniral grupo s podanim imenom (neuporabno)
-	- [x] runtime
-		- [x] ustvari pomnilnik za grupe
-		- [x] napolni pomnilnik z vrednostmi
-			- [x] zapiši en znak v pomnilnik
-			- [x] zapiši neomejeno število znakov pomnilnik
-		- [x] preberi vrednost iz pomnilnika
-		- [x] preberi vrednost iz pomnilnika in jo vstavi na ustrezno mesto, kjer se sklicujemo na grupo
-		
-		Kaj dela:
-		- [x] \(a\)1 = (a)a
-		- [x] \(abc\)def1 = (abc)defabc
-		- [x] \(a*\)1 = (), (a)a, (aa)aa, (aaa)aaa
+Main idea of the project is based on the article [Enumerating the
+strings of regular languages](http://www.cs.dartmouth.edu/~doug/nfa.ps.gz).
+This project expanded prior work by adding ability to capture group
+contents and use it when generating strings and attaching a parser for
+regular expressions to make it easier to enter them.
 
-NAPREDNA VERZIJA
-- Radi bi dodali še
-	- [x] gnezdenje grup: (a(b))2 = (a(b))b
-	- [ ] poseben znak za 'pastanje' grupe in ne Int številke (opcijsko)
-	
-- [X] Gnezdene grupe (ne perfektno optimalno)
-	- [x] Glavni pomnilnik, ki shrani vse grupe (te naj bodo po vrsti v pomnilniku: 1, 2, 3, 4, 5, ...)
-	- [x] Pomožni pomnilnik, ki hrani stevilke grup, v katerih se trenutno nahajamo
-		- [x] Funkcija, ki preverja, če gremo v novo grupo
-			- ko pridemo do oklepaja
-			- oštevilči novo grupo
-		- [x] Funkcija, ki preverja konec grupe
-			- ko pridemo do zaklepaja
-		- [x] Funkcija, ki zbriše številko grupe, ki se je končala, iz pomožnega pomnilnika
-		- [ ] Funkcija za dodajanje elementov v vse trenutne grupe
-			- [x] NI OPTIMALNO 	
-				- pomozni pomnilnik je oblike [5,2,1] in za enkrat bomo vzeli grupo in vanjo zapisali znak
-				- O(n^2)
-			- [x] OPTIMALNO 	
-				- v enem prehodu dodamo v vse grupe določen znak
-				- O(n)
-	- [x] Funkcija, ki doda element vsem grupam v gl. pomnilniku, ki so zastopane v pomožnem pomnilniku 	
-	
-POPRAVKI
-- GROUPS -> (Int, [String])
-- vsi-cur
 
-OPAZKE
-- grupe ne pokvarijo urejenosti nizov po dolžini -vse nize z grupami lahko enolično preslikamo v nize brez grup
+## Installation
 
-- a(b)1* -> KUL, ker '1' obravnava kot navaden znak, npr 'a'
-- a(a(b)+)%2 -> 
-	a(a(b)+)     |   a(a(b)+)%2
-	aab				aab%b
-	aabb			aabb%bb
-	
-- a(bb)(a|1) -> PADE, ker bi morali hkrati preverjat še dolžino nizov na obeh straneh alternacije
+After cloning repository, execute following sequence of commands:
 
-- (a | (b)) (c | \2) -> 2. ni nujno da se sklicuje na b v drugi grupi, ker možno, da ne obstaja, ampak
-je naslednji oklep0aj
-- back ref, če ga ni -> error
+    $ cabal configure
+    $ cabal build
+    $ cabal install
 
-TABLA
-- 
+This will install library files into proper locations and also install
+executable `listlang` into bin folder.
+
+If one wants to test sources using built-in test suite, proper sequence
+of commands to execute is:
+
+    $ cabal configure --enable-tests
+    $ cabal build
+    $ cabal test
+
+Generating API docs is also similarly simple:
+
+    $ cabal haddock
+
+
+## Usage
+
+Functionality of this package can be consumed in two ways: by using
+provided executable `listlang` or by directly using provided packages in
+application development.
+
+
+### Using standalone program
+
+Using standalone program is quite straightforward. Simply run
+
+    $ listlang REGEX
+
+to enumerate regular expresion REGEX, passed in as string. For example,
+to generate all character pairs, we can execute
+
+    $ listlang ".."
+
+and get back list of strings, one per line. This can be quite usefull in
+constructs such as *for loops* in bash, where we can capture output and
+iterate over it, probably feeding it into some application for further
+processing.
+
+It is possible to modify output of this program by providing additional
+switches when executing command. More information about possible
+switches can be found by executing `listlang` with no parameters.
+
+
+### Using library in application
+
+When used as a library, this package is most useful when used in
+combination with `QuickCheck`, where it can serve as a data source. For
+complete demonstration of how to utilise this library as a data source,
+have a look at `examples/qc.hs` script.
